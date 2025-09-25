@@ -338,6 +338,36 @@ class EngagementRepository:
                 f"   • Total Steering Interventions: {total_steer_interventions} ({total_steer_interventions_per_100km:.2f}/100km)"
             )
 
+            if any(bucket_totals[bucket['key']]['time'] > 0 for bucket in SPEED_BUCKETS):
+                lines.append('   • Speed Bucket Engagement:')
+                for bucket_cfg in SPEED_BUCKETS:
+                    data = bucket_totals[bucket_cfg['key']]
+                    if data['time'] <= 0:
+                        continue
+                    total_time_min = data['time'] / 1e9 / 60
+                    engaged_time_min = data['engaged_time'] / 1e9 / 60
+                    total_distance_km = data['distance']
+                    engaged_distance_km = data['engaged_distance']
+                    engagement_time_pct = (
+                        data['engaged_time'] / data['time'] * 100
+                        if data['time'] > 0 else None
+                    )
+                    engagement_dist_pct = (
+                        engaged_distance_km / total_distance_km * 100
+                        if total_distance_km > 0 else None
+                    )
+                    lines.append(
+                        "     - {label}: {time_pct} / {dist_pct} (time {eng:.1f}/{tot:.1f} min, distance {eng_dist:.1f}/{tot_dist:.1f} km)".format(
+                            label=bucket_cfg['label'],
+                            time_pct=_format_pct(engagement_time_pct, 2),
+                            dist_pct=_format_pct(engagement_dist_pct, 2),
+                            eng=engaged_time_min,
+                            tot=total_time_min,
+                            eng_dist=engaged_distance_km,
+                            tot_dist=total_distance_km,
+                        )
+                    )
+
             lines.append('=' * 120)
 
         return '\n'.join(lines)
