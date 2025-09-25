@@ -328,8 +328,6 @@ class EngagementRepository:
             )
             total_steer_interventions_per_100km = (
                 (total_steer_interventions / total_distance * 100) if total_distance else 0.0
-            )
-
             lines.append('📈 TOTALS:')
             lines.append(f"   • Total Distance: {total_distance:.1f} km")
             lines.append(f"   • Overall Time Engagement: {_format_pct(total_percentage)}")
@@ -359,7 +357,7 @@ class EngagementRepository:
                 f"   • Total Steering Interventions: {total_steer_interventions} ({total_steer_interventions_per_100km:.2f}/100km)"
             )
 
-            if any(bucket_totals[bucket['key']]['time'] > 0 for bucket in SPEED_BUCKETS):
+            if any(data['time'] > 0 for data in bucket_totals.values()):
                 lines.append('   • Speed Bucket Engagement:')
                 for bucket_cfg in SPEED_BUCKETS:
                     data = bucket_totals[bucket_cfg['key']]
