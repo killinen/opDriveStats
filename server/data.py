@@ -328,6 +328,7 @@ class EngagementRepository:
             )
             total_steer_interventions_per_100km = (
                 (total_steer_interventions / total_distance * 100) if total_distance else 0.0
+            )
             lines.append('📈 TOTALS:')
             lines.append(f"   • Total Distance: {total_distance:.1f} km")
             lines.append(f"   • Overall Time Engagement: {_format_pct(total_percentage)}")
