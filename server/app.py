@@ -1,5 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from .data import repository
 
@@ -15,6 +19,9 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+
+templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / 'templates'))
 
 
 @app.get('/health', summary='Health check')
@@ -45,3 +52,9 @@ def device_details(device_id: str) -> dict:
         'drives': repository.format_drive_details(drives),
         'last_loaded': repository.last_updated(),
     }
+
+
+@app.get('/stats', summary='CLI-style engagement summary', response_class=HTMLResponse)
+def stats_view(request: Request) -> HTMLResponse:
+    summary_text = repository.cli_summary()
+    return templates.TemplateResponse('stats.html', {'request': request, 'summary': summary_text})

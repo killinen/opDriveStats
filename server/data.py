@@ -40,6 +40,12 @@ def _safe_mean(values: List[Optional[float]]) -> Optional[float]:
     return mean(filtered)
 
 
+def _format_pct(value: Optional[float], decimals: int = 1) -> str:
+    if value is None:
+        return 'N/A'
+    return f"{value:.{decimals}f}%"
+
+
 class EngagementRepository:
     """Load engagement statistics from a JSON file with basic caching."""
 
@@ -160,5 +166,180 @@ class EngagementRepository:
         formatted.sort(key=lambda item: item['drive_started_at'] or '', reverse=True)
         return formatted
 
+
+    def cli_summary(self, include_device_columns: bool = False) -> str:
+        lines: List[str] = []
+        lines.append('=' * 120)
+        lines.append('📊 ENGAGEMENT SUMMARY')
+        lines.append('=' * 120)
+
+        all_devices = sorted({entry.get('device_id') or 'unknown' for entry in self.all_entries()})
+
+        if not all_devices:
+            lines.append('No engagement data available.')
+            lines.append('=' * 120)
+            return '\n'.join(lines)
+
+        for device_id in all_devices:
+            drives = self.drives_for_device(device_id)
+            if not drives:
+                continue
+
+            lines.append(f"\n🚗 Device: {device_id}")
+
+            header = (
+                f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
+                f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
+                f"{'Steer':<6} {'ST/100km':<8} {'Press_s/h':<10}"
+            )
+            if include_device_columns:
+                header += f" {'OPLong':<7} {'Version':<14} {'Branch':<16} {'Car':<20} {'Device':<12}"
+
+            separator = '-' * len(header)
+            lines.append(header)
+            lines.append(separator)
+
+            total_time = 0.0
+            total_active_time = 0.0
+            total_drive_time = 0.0
+            total_drive_active_time = 0.0
+            total_distance = 0.0
+            total_engaged_distance = 0.0
+            total_interventions = 0
+            total_steer_interventions = 0
+            total_cruise_press_time_ns = 0
+
+            sorted_drives = sorted(
+                drives,
+                key=lambda item: _parse_drive_timestamp(item.get('drive')) or datetime.min
+            )
+
+            for drive in sorted_drives:
+                drive_name = drive.get('drive') or 'unknown'
+                total_time_ns = drive.get('total_time') or 0
+                active_time_ns = drive.get('active_time') or 0
+                drive_time_ns = drive.get('drive_time') or 0
+                drive_active_time_ns = drive.get('drive_time_active') or 0
+                distance_km = drive.get('odo_distance') or 0.0
+                engaged_distance_km = drive.get('engaged_distance') or 0.0
+                disengagements = drive.get('intervention_count') or 0
+                steer_interventions = drive.get('steer_intervention_count') or 0
+                cruise_press_time_ns = drive.get('cruise_press_time_ns') or 0
+
+                if total_time_ns <= 0:
+                    continue
+
+                total_time += total_time_ns
+                total_active_time += active_time_ns
+                total_drive_time += drive_time_ns
+                total_drive_active_time += drive_active_time_ns
+                total_distance += distance_km
+                total_engaged_distance += engaged_distance_km
+                total_interventions += disengagements
+                total_steer_interventions += steer_interventions
+                total_cruise_press_time_ns += cruise_press_time_ns
+
+                duration_minutes = total_time_ns / 1e9 / 60
+                drive_duration_minutes = drive_time_ns / 1e9 / 60
+                time_pct = (active_time_ns / total_time_ns * 100) if total_time_ns else 0
+                drive_pct = (
+                    drive.get('drive_time_engagement_pct')
+                    if drive.get('drive_time_engagement_pct') is not None
+                    else (drive_active_time_ns / drive_time_ns * 100 if drive_time_ns else None)
+                )
+                odo_pct = drive.get('engagement_pct_odo')
+                diseng_per_100km = drive.get('interventions_per_100km')
+                steer_per_100km = drive.get('steer_interventions_per_100km')
+                press_seconds_per_hour = drive.get('cruise_press_seconds_per_hour')
+
+                drive_display = drive_name.replace('--', ' ').replace('-', '/')[:20]
+                row = (
+                    f"{drive_display:<20} {duration_minutes:>6.1f}min {drive_duration_minutes:>6.1f}min "
+                    f"{distance_km:>6.1f}km {engaged_distance_km:>7.1f}km "
+                    f"{time_pct:>5.1f}% {(_format_pct(drive_pct, 1) if drive_pct is not None else 'N/A'):>7} "
+                    f"{(_format_pct(odo_pct, 1) if odo_pct is not None else 'N/A'):>7} "
+                    f"{disengagements:>6} {diseng_per_100km or 0:>9.1f} "
+                    f"{steer_interventions:>6} {steer_per_100km or 0:>8.1f} "
+                    f"{press_seconds_per_hour or 0:>10.2f}"
+                )
+
+                if include_device_columns:
+                    opl = drive.get('openpilot_longitudinal')
+                    if opl is True:
+                        opl_display = 'ON'
+                    elif opl is False:
+                        opl_display = 'OFF'
+                    else:
+                        opl_display = '—'
+
+                    version_value = drive.get('version') or '—'
+                    if len(version_value) > 14:
+                        version_value = version_value[:13] + '…'
+                    branch_value = drive.get('git_branch') or '—'
+                    if len(branch_value) > 16:
+                        branch_value = branch_value[:15] + '…'
+                    car_value = drive.get('car_fingerprint') or '—'
+                    if len(car_value) > 20:
+                        car_value = car_value[:19] + '…'
+                    device_value = drive.get('device_type') or '—'
+                    if len(device_value) > 12:
+                        device_value = device_value[:11] + '…'
+
+                    row += (
+                        f" {opl_display:<7} {version_value:<14} {branch_value:<16} {car_value:<20} {device_value:<12}"
+                    )
+
+                lines.append(row)
+
+            if total_time <= 0:
+                lines.append('No valid drive data found for this device.')
+                continue
+
+            lines.append(separator)
+
+            total_percentage = (total_active_time / total_time * 100) if total_time else None
+            total_drive_percentage = (
+                (total_drive_active_time / total_drive_time * 100)
+                if total_drive_time else None
+            )
+            total_interventions_per_100km = (
+                (total_interventions / total_distance * 100) if total_distance else 0.0
+            )
+            total_steer_interventions_per_100km = (
+                (total_steer_interventions / total_distance * 100) if total_distance else 0.0
+            )
+
+            lines.append('📈 TOTALS:')
+            lines.append(f"   • Total Distance: {total_distance:.1f} km")
+            lines.append(f"   • Overall Time Engagement: {_format_pct(total_percentage)}")
+
+            if total_distance > 0 and total_engaged_distance > 0:
+                odo_pct_total = total_engaged_distance / total_distance * 100
+                lines.append(f"   • Overall ODO Engagement: {_format_pct(odo_pct_total)}")
+
+            if total_drive_time > 0:
+                total_drive_minutes = total_drive_time / 1e9 / 60
+                lines.append(f"   • Total Drive Time: {total_drive_minutes:.1f} min")
+                lines.append(f"   • Drive-Time Engagement: {_format_pct(total_drive_percentage)}")
+
+                total_drive_hours = total_drive_time / 1e9 / 3600
+                if total_drive_hours > 0 and total_cruise_press_time_ns > 0:
+                    press_seconds = total_cruise_press_time_ns / 1e9
+                    lines.append(f"   • Total Cruise Button Press Time: {press_seconds:.1f} s")
+                    press_seconds_per_hour = press_seconds / total_drive_hours
+                    lines.append(
+                        f"   • Cruise Press Seconds per Drive Hour: {press_seconds_per_hour:.2f}s"
+                    )
+
+            lines.append(
+                f"   • Total Disengagements: {total_interventions} ({total_interventions_per_100km:.2f}/100km)"
+            )
+            lines.append(
+                f"   • Total Steering Interventions: {total_steer_interventions} ({total_steer_interventions_per_100km:.2f}/100km)"
+            )
+
+            lines.append('=' * 120)
+
+        return '\n'.join(lines)
 
 repository = EngagementRepository()

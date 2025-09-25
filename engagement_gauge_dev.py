@@ -49,6 +49,26 @@ VEGO_MOVING_THRESHOLD = 1.0
 BACKUP_DIR = 'database_backups'
 VEHICLE_PROFILE_CONFIG = 'config/vehicle_profiles.json'
 
+SPEED_BUCKETS = [
+    {
+        'key': 'city',
+        'label': 'City (≤55 km/h)',
+        'min_speed': 0.0,
+        'max_speed': 15.3,
+    },
+    {
+        'key': 'road',
+        'label': 'Road (55-90 km/h)',
+        'min_speed': 15.3,
+        'max_speed': 25.0,
+    },
+    {
+        'key': 'highway',
+        'label': 'Highway (≥90 km/h)',
+        'min_speed': 25.0,
+        'max_speed': None,
+    },
+]
 
 engagement_db_modified = False
 debug_db_modified = False
@@ -190,6 +210,15 @@ class VehicleSignalDecoder:
         return results
 
 
+
+def _speed_bucket_for(speed_mps: float) -> str:
+    for bucket in SPEED_BUCKETS:
+        min_speed = bucket['min_speed']
+        max_speed = bucket['max_speed']
+        if speed_mps >= min_speed and (max_speed is None or speed_mps < max_speed):
+            return bucket['key']
+    return SPEED_BUCKETS[-1]['key']
+
 def _combine_signal_list(values: Any) -> Optional[int]:
     """Aggregate a list of signal values into a bit mask, or return the scalar unchanged."""
     if not isinstance(values, list):
@@ -240,6 +269,7 @@ SUMMARY_METRICS = [
     ("Total Disengagements", "Sum of disengagement cycles plus their rate per 100 km."),
     ("Total Steering Interventions", "Sum of steering interventions plus their rate per 100 km."),
     ("DevType", "Device type reported by carParams; blank when not available in the logs."),
+    ("Speed Bucket Engagement", "Breakdown of engagement by speed ranges (city/road/highway) showing time and distance splits."),
 ]
 
 METRIC_NOTES = [
@@ -248,6 +278,7 @@ METRIC_NOTES = [
     "Steering interventions are detected when the filtered driver torque diverges from the EPS torque while engaged.",
     "Cruise button time measures how long any mapped cruise button signal is held, including resume/set/etc.",
     "OP Long reports whether carParams.openpilotLongitudinalControl was true at any point during the drive.",
+    "Speed buckets use city (≤50 km/h), road (50-90 km/h), and highway (≥90 km/h) thresholds.",
 ]
 
 
@@ -345,6 +376,12 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
         'openpilot_longitudinal': None,
         'car_fingerprint': None,
         'device_type': None,
+        'speed_buckets': {bucket['key']: {
+            'time': 0,
+            'engaged_time': 0,
+            'distance': 0.0,
+            'engaged_distance': 0.0,
+        } for bucket in SPEED_BUCKETS},
     }
     engaged_distance = 0
     last_odo = None
@@ -398,6 +435,7 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
             last_carstate_time = None
             last_cruise_state = 0
             last_cruise_time = None
+            prev_speed = 0.0
 
             for msg in lr:
                 if msg.which() == 'controlsState':
@@ -542,6 +580,16 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
 
                     if last_carstate_time is not None:
                         delta = msg.logMonoTime - last_carstate_time
+                        if delta > 0:
+                            bucket_key = _speed_bucket_for(prev_speed)
+                            bucket = drive_stats['speed_buckets'][bucket_key]
+                            bucket['time'] += delta
+                            if prev_engaged:
+                                bucket['engaged_time'] += delta
+                            distance_delta = prev_speed * (delta / 1e9) / 1000.0
+                            bucket['distance'] += distance_delta
+                            if prev_engaged:
+                                bucket['engaged_distance'] += distance_delta
                         if prev_moving and delta > 0:
                             drive_time += delta
                             if prev_engaged:
@@ -550,6 +598,7 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
                     prev_moving = moving
                     prev_engaged = currently_engaged
                     last_carstate_time = msg.logMonoTime
+                    prev_speed = v_ego
 
             # Accumulate segment stats to drive stats
             drive_stats['total_time'] += total_time
@@ -596,6 +645,28 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
     # Store intervention counts
     drive_stats['total_state_changes'] = engagement_state_changes
     drive_stats['intervention_count'] = interventions
+    bucket_summary = {}
+    for bucket_cfg in SPEED_BUCKETS:
+        key = bucket_cfg['key']
+        data = drive_stats['speed_buckets'][key]
+        total_time_min = data['time'] / 1e9 / 60
+        engaged_time_min = data['engaged_time'] / 1e9 / 60
+        total_distance_km = data['distance']
+        engaged_distance_km = data['engaged_distance']
+        engagement_pct = (data['engaged_time'] / data['time'] * 100) if data['time'] > 0 else None
+        bucket_summary[key] = {
+            'label': bucket_cfg['label'],
+            'time_min': round(total_time_min, 2),
+            'engaged_time_min': round(engaged_time_min, 2),
+            'distance_km': round(total_distance_km, 2),
+            'engaged_distance_km': round(engaged_distance_km, 2),
+            'engagement_pct': round(engagement_pct, 2) if engagement_pct is not None else None,
+            'time_ns': data['time'],
+            'engaged_time_ns': data['engaged_time'],
+            'distance_km_raw': total_distance_km,
+            'engaged_distance_km_raw': engaged_distance_km,
+        }
+    drive_stats['speed_buckets'] = bucket_summary
     drive_stats['steer_intervention_count'] = total_steer_interventions
     drive_stats['version'] = version_info.get('version')
     drive_stats['git_branch'] = version_info.get('git_branch')
@@ -658,6 +729,7 @@ def main():
     parser.add_argument('--compress-on-c2', action='store_true', help='Compress raw rlogs directly on the device before download (experimental).')
     parser.add_argument('--info', action='store_true', help='Show detailed explanations of all reported metrics and exit.')
     parser.add_argument('--device-stats', action='store_true', help='Include version, branch, car fingerprint, and device ID columns in the summary table.')
+    parser.add_argument('--speed-buckets', action='store_true', help='Show per-drive engagement breakdown by speed buckets in the summary table.')
     parser.add_argument('--vehicle-profile', type=str, help='Vehicle profile key defined in config/vehicle_profiles.json.')
     args = parser.parse_args()
 
@@ -839,6 +911,7 @@ def main():
                             'version': entry.get('version'),
                             'git_branch': entry.get('git_branch'),
                             'git_commit': entry.get('git_commit'),
+                            'speed_buckets': entry.get('speed_buckets'),
                         }
 
             local_drives = find_local_rlog_files(device_id)
@@ -891,6 +964,7 @@ def main():
                     "openpilot_longitudinal": drive_stats.get('openpilot_longitudinal'),
                     "car_fingerprint": drive_stats.get('car_fingerprint'),
                     "device_type": drive_stats.get('device_type'),
+                    "speed_buckets": drive_stats.get('speed_buckets'),
                     "recorded_at": timestamp
                 }
 
@@ -1201,6 +1275,7 @@ def main():
                         "openpilot_longitudinal": drive_stats.get('openpilot_longitudinal'),
                         "car_fingerprint": drive_stats.get('car_fingerprint'),
                         "device_type": drive_stats.get('device_type'),
+                        "speed_buckets": drive_stats.get('speed_buckets'),
                         "recorded_at": timestamp
                     }
 
@@ -1246,7 +1321,7 @@ def main():
     # Print final stats summary to console
     print("\n" + "="*140)
     print("📊 ENGAGEMENT SUMMARY")
-    print("="*140)
+    print("="*120)
     
     # Filter the summary if a start or stop drive is provided
     if args.start or args.stop:
@@ -1265,6 +1340,7 @@ def main():
         total_distance = 0
         total_engaged_distance = 0
         total_cruise_press_time_ns = 0
+        bucket_aggregate = {bucket['key']: {'time': 0, 'engaged_time': 0, 'distance': 0.0, 'engaged_distance': 0.0} for bucket in SPEED_BUCKETS}
 
         sorted_drives = sorted(
             drives.items(),
@@ -1273,6 +1349,7 @@ def main():
 
         # Header for drive details
         show_device_columns = getattr(args, 'device_stats', False)
+        show_speed_rows = getattr(args, 'speed_buckets', False)
         header_line = (
             f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
             f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
@@ -1332,6 +1409,17 @@ def main():
                 press_s_per_hour = stats.get('cruise_press_seconds_per_hour')
                 press_s_per_hour_str = f"{press_s_per_hour:.2f}" if press_s_per_hour is not None else "0.00"
 
+                bucket_stats = stats.get('speed_buckets') or {}
+                for bucket_cfg in SPEED_BUCKETS:
+                    key = bucket_cfg['key']
+                    data = bucket_stats.get(key)
+                    if not data:
+                        continue
+                    bucket_aggregate[key]['time'] += data.get('time_ns', 0)
+                    bucket_aggregate[key]['engaged_time'] += data.get('engaged_time_ns', 0)
+                    bucket_aggregate[key]['distance'] += data.get('distance_km_raw', 0.0)
+                    bucket_aggregate[key]['engaged_distance'] += data.get('engaged_distance_km_raw', 0.0)
+
                 opl = stats.get('openpilot_longitudinal')
                 if opl is True:
                     opl_display = 'ON'
@@ -1361,6 +1449,33 @@ def main():
                     row += f" {version_display:<13} {branch_display:<15} {car_display:<18} {device_display:<10}"
 
                 print(row)
+
+                if show_speed_rows:
+                    bucket_stats = stats.get('speed_buckets') or {}
+                    for bucket_cfg in SPEED_BUCKETS:
+                        data = bucket_stats.get(bucket_cfg['key'])
+                        if not data:
+                            continue
+                        time_total = data.get('time_min', 0) or 0
+                        dist_total = data.get('distance_km', 0) or 0
+                        if time_total == 0 and dist_total == 0:
+                            continue
+                        engagement_pct = data.get('engagement_pct')
+                        engagement_time_pct = engagement_pct if engagement_pct is not None else None
+                        engagement_dist_pct = (data.get('engaged_distance_km', 0) / dist_total * 100) if dist_total > 0 else None
+                        time_pct_str = f"{engagement_time_pct:.2f}%" if engagement_time_pct is not None else 'N/A'
+                        dist_pct_str = f"{engagement_dist_pct:.2f}%" if engagement_dist_pct is not None else 'N/A'
+                        time_eng = data.get('engaged_time_min', 0) or 0
+                        dist_eng = data.get('engaged_distance_km', 0) or 0
+                        print("            • {label}: {time_pct}/{dist_pct} (time {eng:.1f}/{tot:.1f} min, dist {dist_eng:.1f}/{dist_tot:.1f} km)".format(
+                            label=bucket_cfg['label'],
+                            time_pct=time_pct_str,
+                            dist_pct=dist_pct_str,
+                            eng=time_eng,
+                            tot=time_total,
+                            dist_eng=dist_eng,
+                            dist_tot=dist_total
+                        ))
 
         print(separator)
         
@@ -1394,8 +1509,30 @@ def main():
                     print(f"   • Cruise Press Seconds per Drive Hour: {press_seconds_per_hour:.2f}s")
             print(f"   • Total Disengagements: {total_interventions} ({total_interventions_per_100km:.2f}/100km)")
             print(f"   • Total Steering Interventions: {total_steer_interventions} ({total_steer_interventions_per_100km:.2f}/100km)")
-        
-        print("="*140)
+
+            if any(values['time'] > 0 for values in bucket_aggregate.values()):
+                print("   • Speed Bucket Engagement:")
+                for bucket_cfg in SPEED_BUCKETS:
+                    data = bucket_aggregate[bucket_cfg['key']]
+                    if data['time'] == 0:
+                        continue
+                    total_time_min = data['time'] / 1e9 / 60
+                    engaged_time_min = data['engaged_time'] / 1e9 / 60
+                    total_distance_km = data['distance']
+                    engaged_distance_km = data['engaged_distance']
+                    engagement_time_pct = (data['engaged_time'] / data['time'] * 100) if data['time'] > 0 else 0
+                    engagement_dist_pct = (data['engaged_distance'] / data['distance'] * 100) if data['distance'] > 0 else 0
+                    print("     - {label}: {time_pct:.2f}%/{dist_pct:.2f}% (time {eng:.1f}/{tot:.1f} min, distance {dist_eng:.1f}/{dist_tot:.1f} km)".format(
+                        label=bucket_cfg['label'],
+                        time_pct=engagement_time_pct,
+                        dist_pct=engagement_dist_pct,
+                        eng=engaged_time_min,
+                        tot=total_time_min,
+                        dist_eng=engaged_distance_km,
+                        dist_tot=total_distance_km
+                    ))
+
+        print("="*120)
 
     # Persist engagement database to disk (with backup) only if it changed
     if engagement_db_modified:
