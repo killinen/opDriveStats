@@ -1,0 +1,70 @@
+{
+  "default_profile": "hyundai_i30_2014",
+  "profiles": {
+    "hyundai_i30_2014": {
+      "description": "Hyundai i30 2014 using MDPS/VSM2 torque and cluster odometer signals.",
+      "dbc_file": "DBC/hyundai_i30_2014.dbc",
+      "signals": {
+        "odometer": {
+          "message": "CLU1",
+          "signal": "CF_Clu_Odometer",
+          "source": 0
+        },
+        "cruise_state": [
+          {
+            "message": "CLU1",
+            "signal": "CF_Clu_CruiseSwState",
+            "source": 0
+          }
+        ],
+        "steering_driver_torque": {
+          "message": "VSM2",
+          "signal": "CR_Mdps_StrTq",
+          "source": 0,
+          "transform": {
+            "scale": -1.0,
+            "offset": -0.2
+          }
+        },
+        "steering_motor_torque": {
+          "message": "STEERING_STATUS",
+          "signal": "STEERING_TORQUE",
+          "source": 1
+        }
+      }
+    },
+    "Dummy corolla": {
+      "description": "asdhf\u00f6as",
+      "dbc_file": "DBC/toyota_nodsu_pt_generated.dbc",
+      "signals": {
+        "odometer": {
+          "message": "UI_SETTING",
+          "signal": "ODOMETER",
+          "source": 0
+        },
+        "steering_driver_torque": {
+          "message": "STEER_TORQUE_SENSOR",
+          "signal": "STEER_TORQUE_DRIVER",
+          "source": 0
+        },
+        "cruise_state": [
+          {
+            "message": "DSU_CRUISE",
+            "signal": "RES_BTN",
+            "source": 0
+          },
+          {
+            "message": "DSU_CRUISE",
+            "signal": "SET_BTN",
+            "source": 0
+          }
+        ],
+        "steering_motor_torque": {
+          "message": "STEER_TORQUE_SENSOR",
+          "signal": "STEER_TORQUE_EPS",
+          "source": 0
+        }
+      }
+    }
+  }
+}
