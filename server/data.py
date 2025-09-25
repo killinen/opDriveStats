@@ -8,6 +8,27 @@ from typing import Any, Dict, List, Optional
 
 _DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / 'engagement_db.json'
 
+SPEED_BUCKETS = [
+    {
+        'key': 'city',
+        'label': 'City (≤55 km/h)',
+        'min_speed': 0.0,
+        'max_speed': 15.3,
+    },
+    {
+        'key': 'road',
+        'label': 'Road (55-90 km/h)',
+        'min_speed': 15.3,
+        'max_speed': 25.0,
+    },
+    {
+        'key': 'highway',
+        'label': 'Highway (≥90 km/h)',
+        'min_speed': 25.0,
+        'max_speed': None,
+    },
+]
+
 
 def _parse_drive_timestamp(value: Optional[str]) -> Optional[datetime]:
     if not value:
