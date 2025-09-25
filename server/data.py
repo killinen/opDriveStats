@@ -229,6 +229,15 @@ class EngagementRepository:
             total_interventions = 0
             total_steer_interventions = 0
             total_cruise_press_time_ns = 0
+            bucket_totals = {
+                bucket['key']: {
+                    'time': 0,
+                    'engaged_time': 0,
+                    'distance': 0.0,
+                    'engaged_distance': 0.0,
+                }
+                for bucket in SPEED_BUCKETS
+            }
 
             sorted_drives = sorted(
                 drives,
@@ -311,6 +320,17 @@ class EngagementRepository:
                     )
 
                 lines.append(row)
+
+                bucket_stats = drive.get('speed_buckets') or {}
+                for bucket_cfg in SPEED_BUCKETS:
+                    key = bucket_cfg['key']
+                    data = bucket_stats.get(key)
+                    if not data:
+                        continue
+                    bucket_totals[key]['time'] += data.get('time_ns', 0)
+                    bucket_totals[key]['engaged_time'] += data.get('engaged_time_ns', 0)
+                    bucket_totals[key]['distance'] += data.get('distance_km_raw', 0.0)
+                    bucket_totals[key]['engaged_distance'] += data.get('engaged_distance_km_raw', 0.0)
 
             if total_time <= 0:
                 lines.append('No valid drive data found for this device.')
