@@ -189,16 +189,31 @@ class EngagementRepository:
 
 
     def cli_summary(self, include_device_columns: bool = False) -> str:
+        header = (
+            f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
+            f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
+            f"{'Steer':<6} {'ST/100km':<8} {'Press_s/h':<10}"
+        )
+        if include_device_columns:
+            header += f" {'OPLong':<7} {'Version':<14} {'Branch':<16} {'Car':<20} {'Device':<12}"
+
+        line_width = max(120, len(header))
+        separator = '-' * len(header)
+
+        title = '📊 ENGAGEMENT SUMMARY'
         lines: List[str] = []
-        lines.append('=' * 120)
-        lines.append('📊 ENGAGEMENT SUMMARY')
-        lines.append('=' * 120)
+        lines.append('=' * line_width)
+        if len(title) < line_width:
+            lines.append(title.center(line_width))
+        else:
+            lines.append(title)
+        lines.append('=' * line_width)
 
         all_devices = sorted({entry.get('device_id') or 'unknown' for entry in self.all_entries()})
 
         if not all_devices:
             lines.append('No engagement data available.')
-            lines.append('=' * 120)
+            lines.append('=' * line_width)
             return '\n'.join(lines)
 
         for device_id in all_devices:
@@ -207,16 +222,6 @@ class EngagementRepository:
                 continue
 
             lines.append(f"\n🚗 Device: {device_id}")
-
-            header = (
-                f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
-                f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
-                f"{'Steer':<6} {'ST/100km':<8} {'Press_s/h':<10}"
-            )
-            if include_device_columns:
-                header += f" {'OPLong':<7} {'Version':<14} {'Branch':<16} {'Car':<20} {'Device':<12}"
-
-            separator = '-' * len(header)
             lines.append(header)
             lines.append(separator)
 
@@ -408,7 +413,7 @@ class EngagementRepository:
                         )
                     )
 
-            lines.append('=' * 120)
+            lines.append('=' * line_width)
 
         return '\n'.join(lines)
 

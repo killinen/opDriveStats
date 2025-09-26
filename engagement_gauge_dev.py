@@ -1318,11 +1318,27 @@ def main():
                         pass
                 continue
 
-    # Print final stats summary to console
-    print("\n" + "="*140)
-    print("📊 ENGAGEMENT SUMMARY")
-    print("="*120)
-    
+    show_device_columns = getattr(args, 'device_stats', False)
+    show_speed_rows = getattr(args, 'speed_buckets', False)
+
+    header_base = (
+        f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
+        f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
+        f"{'Steer':<6} {'ST/100km':<8} {'Press_s/h':<10} {'OPLong':<7}"
+    )
+    if show_device_columns:
+        header_line = header_base + f" {'Version':<14} {'Branch':<16} {'Car':<20} {'Device':<12}"
+    else:
+        header_line = header_base
+
+    line_width = max(120, len(header_line))
+    separator = '-' * len(header_line)
+
+    title = '📊 ENGAGEMENT SUMMARY'
+    print("\n" + "=" * line_width)
+    print(title.center(line_width) if len(title) < line_width else title)
+    print("=" * line_width)
+
     # Filter the summary if a start or stop drive is provided
     if args.start or args.stop:
         for device_id in all_stats:
@@ -1330,7 +1346,7 @@ def main():
 
     for device_id, drives in all_stats.items():
         print(f"\n🚗 Device: {device_id}")
-        
+
         total_device_active_time = 0
         total_device_time = 0
         total_device_drive_time = 0
@@ -1347,19 +1363,6 @@ def main():
             key=lambda item: parse_drive_timestamp(item[0]) or datetime.min
         )
 
-        # Header for drive details
-        show_device_columns = getattr(args, 'device_stats', False)
-        show_speed_rows = getattr(args, 'speed_buckets', False)
-        header_line = (
-            f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
-            f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
-            f"{'Steer':<6} {'ST/100km':<8} {'Press_s/h':<10}"
-        )
-        if show_device_columns:
-            header_line += f" {'OPLong':<7} {'Version':<13} {'Branch':<15} {'Car':<18} {'DevType':<10}"
-        else:
-            header_line += f" {'OPLong':<7}"
-        separator = "-" * len(header_line)
         print(header_line)
         print(separator)
 
@@ -1446,7 +1449,7 @@ def main():
                     device_value = stats.get('device_type') or '—'
                     device_display = device_value if len(device_value) <= 12 else device_value[:11] + '…'
 
-                    row += f" {version_display:<13} {branch_display:<15} {car_display:<18} {device_display:<10}"
+                    row += f" {version_display:<14} {branch_display:<16} {car_display:<20} {device_display:<12}"
 
                 print(row)
 
@@ -1532,7 +1535,7 @@ def main():
                         dist_tot=total_distance_km
                     ))
 
-        print("="*120)
+        print("=" * line_width)
 
     # Persist engagement database to disk (with backup) only if it changed
     if engagement_db_modified:

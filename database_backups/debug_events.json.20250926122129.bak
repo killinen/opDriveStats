@@ -10820,12 +10820,5 @@
     "event_type": "steer_intervention",
     "time_in_segment_s": 6.288066456,
     "reason": "Steering intervention detected (diff: 1.51)"
-  },
-  {
-    "drive": "2025-09-26--10-33-41",
-    "rlog_path": "./rlogs/41c5cb6e/2025-09-26--10-33-41--3/rlog.bz2",
-    "event_type": "steer_intervention",
-    "time_in_segment_s": 25.144647803,
-    "reason": "Steering intervention detected (diff: 1.53)"
   }
 ]

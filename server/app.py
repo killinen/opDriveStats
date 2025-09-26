@@ -56,5 +56,5 @@ def device_details(device_id: str) -> dict:
 
 @app.get('/stats', summary='CLI-style engagement summary', response_class=HTMLResponse)
 def stats_view(request: Request) -> HTMLResponse:
-    summary_text = repository.cli_summary()
+    summary_text = repository.cli_summary(include_device_columns=True)
     return templates.TemplateResponse('stats.html', {'request': request, 'summary': summary_text})

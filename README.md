@@ -88,6 +88,7 @@ Refer to `server/README.md` for:
 
 - `engagement_gauge_dev.py` automatically keeps `engagement_db.json` updated as new drives are processed.
 - The FastAPI layer monitors the file modification time; refreshes are picked up the next time an endpoint is hit (no restart required).
+- Use `./sync_stats.sh -s <host>` to push the refreshed `engagement_db.json` to your VPS via `rsync` (or `scp` if `rsync` isn’t installed remotely); the script honors your `~/.ssh/config` user/identity defaults, stores uploads as `~/engagement_gauge_dev/engagement_db.json` by default, and lets you override the local file, remote path, or user with the `-f`, `-p`, and `-u` flags (or matching `SYNC_STATS_*` env vars).
 
 ## Tips & Troubleshooting
 
