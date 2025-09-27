@@ -56,5 +56,25 @@ def device_details(device_id: str) -> dict:
 
 @app.get('/stats', summary='CLI-style engagement summary', response_class=HTMLResponse)
 def stats_view(request: Request) -> HTMLResponse:
-    summary_text = repository.cli_summary(include_device_columns=True)
+    summary_text = repository.cli_summary(include_device_columns=False)
     return templates.TemplateResponse('stats.html', {'request': request, 'summary': summary_text})
+
+
+@app.get('/stats_mod', summary='Modern engagement dashboard', response_class=HTMLResponse)
+def stats_mod_view(request: Request) -> HTMLResponse:
+    summaries = repository.device_summaries()
+    devices = []
+    for summary in summaries:
+        device_id = summary.get('device_id')
+        drives = repository.format_drive_details(repository.drives_for_device(device_id))
+        devices.append({
+            'summary': summary,
+            'drives': drives,
+        })
+
+    context = {
+        'request': request,
+        'devices': devices,
+        'last_loaded': repository.last_updated(),
+    }
+    return templates.TemplateResponse('stats_mod.html', context)

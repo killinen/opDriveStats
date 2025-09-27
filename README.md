@@ -102,3 +102,20 @@ Refer to `server/README.md` for:
 - Add additional API endpoints or dashboards under `server/` as needed.
 - Extend `engagement_gauge_dev.py` with new debug checks or signal decodings (see `config/vehicle_profiles.json`).
 - Improve documentation or automation scripts—pull requests welcome once the repository is hosted.
+
+### Deploying the FastAPI Server
+
+Use `./deploy_server.sh -s <host>` to sync the local `server/` directory to the remote `~/opDriveStats/server` folder without using git (wrap custom `~` paths in quotes if you override the default). The script:
+- Respects your SSH config for user/keys (override via `-u`),
+- Excludes `.git`, `.venv`, `__pycache__`, and `*.pyc`,
+- Streams directly with `rsync` when available and otherwise pipes a tarball over SSH after clearing the remote directory,
+- Optionally stops and restarts the remote uvicorn process for zero manual steps (`-R` flag).
+
+Restart automation flags (override via env vars `DEPLOY_SERVER_*`):
+
+- `-R` enables the stop/deploy/start flow.
+- `-S <cmd>` sets the remote start command (default `~/start_opdrivestats.sh`).
+- `-T <session>` names the tmux session that should run the server (default `opdrivestats`).
+- `-C <cmd>` customises the stop command (default `pkill -f "uvicorn server.app:app" || true`).
+
+Combine with `./sync_stats.sh -s <host> -p /home/ubuntu/opDriveStats/engagement_db.json` to push both code and data.

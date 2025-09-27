@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Engagement Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0b1020;
+            --bg-card: rgba(19, 26, 48, 0.9);
+            --bg-card-hover: rgba(26, 35, 63, 0.95);
+            --border: rgba(120, 148, 255, 0.25);
+            --accent: #7f8cff;
+            --accent-soft: rgba(127, 140, 255, 0.15);
+            --text: #f5f7ff;
+            --text-muted: #a8b2d6;
+            --chip-bg: rgba(127, 140, 255, 0.15);
+            --chip-text: #d7dcff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: radial-gradient(circle at top left, rgba(127, 140, 255, 0.18), transparent 45%),
+                        radial-gradient(circle at bottom right, rgba(74, 222, 255, 0.2), transparent 50%),
+                        var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .page {
+            max-width: 1680px;
+            margin: 0 auto;
+        }
+
+        header.page-header {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 32px;
+        }
+
+        header.page-header h1 {
+            font-size: 2rem;
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .last-loaded {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            align-self: stretch;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .device-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 32px;
+        }
+
+        .device-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 12px 40px rgba(8, 12, 30, 0.45);
+            transition: transform 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .device-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(127, 140, 255, 0.45);
+            box-shadow: 0 18px 48px rgba(8, 12, 30, 0.55);
+        }
+
+        .device-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .device-id {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 1.05rem;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: var(--chip-bg);
+            color: var(--chip-text);
+        }
+
+        .meta-window {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-align: right;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+        }
+
+        .metric {
+            padding: 12px;
+            border-radius: 14px;
+            background: rgba(127, 140, 255, 0.08);
+            border: 1px solid rgba(127, 140, 255, 0.12);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        details.drive-table {
+            margin-top: 20px;
+            background: rgba(15, 20, 38, 0.85);
+            border-radius: 14px;
+            border: 1px solid rgba(127, 140, 255, 0.12);
+            overflow: hidden;
+        }
+
+        details.drive-table > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            font-weight: 600;
+            position: relative;
+        }
+
+        details.drive-table > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.drive-table > summary::after {
+            content: '▾';
+            font-size: 0.8rem;
+            position: absolute;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%) rotate(-90deg);
+            transition: transform 0.2s ease;
+        }
+
+        details[open].drive-table > summary::after {
+            transform: translateY(-50%) rotate(0deg);
+        }
+
+        .drive-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 1100px;
+        }
+
+        .drive-table thead {
+            background: rgba(127, 140, 255, 0.12);
+        }
+
+        .drive-table th,
+        .drive-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(127, 140, 255, 0.08);
+        }
+
+        .drive-table tbody tr:hover {
+            background: rgba(127, 140, 255, 0.08);
+        }
+
+        .table-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+            padding: 14px 16px;
+            background: rgba(127, 140, 255, 0.08);
+            border-bottom: 1px solid rgba(127, 140, 255, 0.12);
+        }
+
+        .table-controls label {
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+
+        .hidden-column {
+            display: none !important;
+        }
+
+        .drive-table td[data-label] {
+            position: relative;
+        }
+
+        @media (max-width: 960px) {
+            body {
+                padding: 16px;
+            }
+
+            .device-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .drive-table table,
+            .drive-table thead,
+            .drive-table tbody,
+            .drive-table th,
+            .drive-table td,
+            .drive-table tr {
+                display: block;
+            }
+
+            .drive-table thead {
+                display: none;
+            }
+
+            .drive-table td {
+                padding: 8px 16px;
+                border-bottom: none;
+                border-left: 3px solid rgba(127, 140, 255, 0.15);
+                margin-bottom: 10px;
+            }
+
+            .drive-table td::before {
+                content: attr(data-label);
+                display: block;
+                font-size: 0.7rem;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="page-header">
+            <h1>Engagement Dashboard</h1>
+            <div class="last-loaded">
+                {% if last_loaded %}
+                    Last refreshed: {{ last_loaded | replace('T', ' ') }}
+                {% else %}
+                    Waiting for first data sync…
+                {% endif %}
+            </div>
+        </header>
+
+        {% if not devices %}
+            <p style="color: var(--text-muted); font-size: 1.05rem;">No engagement data available.</p>
+        {% endif %}
+
+        <div class="device-grid">
+            {% for device in devices %}
+                {% set summary = device.summary %}
+                <section class="device-card">
+                    <div class="device-header">
+                        <span class="device-id">🚗 {{ summary.device_id }}</span>
+                        <div class="meta-window">
+                            <span>First drive: {{ summary.first_drive | default('—') }}</span>
+                            <span>Latest drive: {{ summary.latest_drive | default('—') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <div class="metric-label">Total Distance</div>
+                            <div class="metric-value">{{ summary.total_distance_km | round(1) }} km</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Overall ODO Engagement</div>
+                            <div class="metric-value">
+                                {% if summary.overall_engagement_pct is not none %}
+                                    {{ summary.overall_engagement_pct | round(1) }}%
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Overall Time Engagement</div>
+                            <div class="metric-value">
+                                {% if summary.overall_time_engagement_pct is not none %}
+                                    {{ summary.overall_time_engagement_pct | round(1) }}%
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Active Hours</div>
+                            <div class="metric-value">{{ summary.total_active_time_hours | round(1) }} h</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Drive Count</div>
+                            <div class="metric-value">{{ summary.drive_count }}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Disengagements /100km</div>
+                            <div class="metric-value">
+                                {% if summary.total_interventions_per_100km is not none %}
+                                    {{ summary.total_interventions_per_100km | round(2) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Total Disengagements</div>
+                            <div class="metric-value">{{ summary.total_intervention_count }}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Total Engaged Distance</div>
+                            <div class="metric-value">{{ summary.total_engaged_distance_km | round(1) }} km</div>
+                        </div>
+                    </div>
+
+                    {% if device.drives %}
+                        <details class="drive-table">
+                            <summary>Drive history ({{ summary.drive_count }})</summary>
+                            <div class="table-controls">
+                                <label><input type="checkbox" data-column-toggle="drive_time"> Drive Time</label>
+                                <label><input type="checkbox" data-column-toggle="active_time"> Active Time</label>
+                                <label><input type="checkbox" data-column-toggle="steer_int"> Steering Interventions</label>
+                                <label><input type="checkbox" data-column-toggle="steer_rate"> Steering /100km</label>
+                                <label><input type="checkbox" data-column-toggle="cruise"> Cruise Press s</label>
+                                <label><input type="checkbox" data-column-toggle="cruise_rate"> Cruise Press s/h</label>
+                                <label><input type="checkbox" data-column-toggle="oplong"> OPLong</label>
+                                <label><input type="checkbox" data-column-toggle="version"> Version</label>
+                                <label><input type="checkbox" data-column-toggle="branch"> Branch</label>
+                                <label><input type="checkbox" data-column-toggle="car"> Car</label>
+                                <label><input type="checkbox" data-column-toggle="device_type"> Device Type</label>
+                                <label><input type="checkbox" data-column-toggle="git"> Git Commit</label>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th data-column="drive">Drive</th>
+                                            <th data-column="engagement_pct">Engagement %</th>
+                                            <th data-column="odo_pct">ODO %</th>
+                                            <th data-column="distance">Distance (km)</th>
+                                            <th data-column="engaged">Engaged (km)</th>
+                                            <th data-column="interventions">Disengagements</th>
+                                            <th data-column="interv_rate">Diseng /100km</th>
+                                            <th data-column="drive_time" class="hidden-column">Drive Time (h)</th>
+                                            <th data-column="active_time" class="hidden-column">Active Time (h)</th>
+                                            <th data-column="steer_int" class="hidden-column">Steer Int</th>
+                                            <th data-column="steer_rate" class="hidden-column">Steer /100km</th>
+                                            <th data-column="cruise" class="hidden-column">Cruise Press (s)</th>
+                                            <th data-column="cruise_rate" class="hidden-column">Cruise Press (s/h)</th>
+                                            <th data-column="oplong" class="hidden-column">OPLong</th>
+                                            <th data-column="version" class="hidden-column">Version</th>
+                                            <th data-column="branch" class="hidden-column">Branch</th>
+                                            <th data-column="car" class="hidden-column">Car</th>
+                                            <th data-column="device_type" class="hidden-column">Device Type</th>
+                                            <th data-column="git" class="hidden-column">Git Commit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for drive in device.drives %}
+                                            <tr>
+                                                <td data-label="Drive" data-column="drive">{{ drive.drive }}</td>
+                                                <td data-label="Engagement %" data-column="engagement_pct">
+                                                    {% if drive.engagement_pct is not none %}
+                                                        {{ drive.engagement_pct | round(1) }}%
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="ODO %" data-column="odo_pct">
+                                                    {% if drive.engagement_pct_odo is not none %}
+                                                        {{ drive.engagement_pct_odo | round(1) }}%
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Distance (km)" data-column="distance">
+                                                    {% if drive.odo_distance_km is not none %}
+                                                        {{ drive.odo_distance_km | round(1) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Engaged (km)" data-column="engaged">
+                                                    {% if drive.engaged_distance_km is not none %}
+                                                        {{ drive.engaged_distance_km | round(1) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Disengagements" data-column="interventions">{{ drive.intervention_count | default('—') }}</td>
+                                                <td data-label="Diseng /100km" data-column="interv_rate">
+                                                    {% if drive.interventions_per_100km is not none %}
+                                                        {{ drive.interventions_per_100km | round(2) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Drive Time (h)" data-column="drive_time" class="hidden-column">
+                                                    {% if drive.drive_time_hours is not none %}
+                                                        {{ drive.drive_time_hours | round(2) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Active Time (h)" data-column="active_time" class="hidden-column">
+                                                    {% if drive.active_time_hours is not none %}
+                                                        {{ drive.active_time_hours | round(2) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Steer Int" data-column="steer_int" class="hidden-column">{{ drive.steer_intervention_count | default('—') }}</td>
+                                                <td data-label="Steer /100km" data-column="steer_rate" class="hidden-column">
+                                                    {% if drive.steer_interventions_per_100km is not none %}
+                                                        {{ drive.steer_interventions_per_100km | round(2) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Cruise Press (s)" data-column="cruise" class="hidden-column">
+                                                    {% if drive.cruise_press_seconds is not none %}
+                                                        {{ drive.cruise_press_seconds | round(1) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Cruise Press (s/h)" data-column="cruise_rate" class="hidden-column">
+                                                    {% if drive.cruise_press_seconds_per_hour is not none %}
+                                                        {{ drive.cruise_press_seconds_per_hour | round(2) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="OPLong" data-column="oplong" class="hidden-column">
+                                                    {% if drive.openpilot_longitudinal is true %}
+                                                        ON
+                                                    {% elif drive.openpilot_longitudinal is false %}
+                                                        OFF
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
+                                                <td data-label="Version" data-column="version" class="hidden-column">{{ drive.version | default('—') }}</td>
+                                                <td data-label="Branch" data-column="branch" class="hidden-column">{{ drive.git_branch | default('—') }}</td>
+                                                <td data-label="Car" data-column="car" class="hidden-column">{{ drive.car_fingerprint | default('—') }}</td>
+                                                <td data-label="Device Type" data-column="device_type" class="hidden-column">{{ drive.device_type | default('—') }}</td>
+                                                <td data-label="Git Commit" data-column="git" class="hidden-column">{{ drive.git_commit | default('—') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    {% else %}
+                        <p style="margin-top: 16px; color: var(--text-muted);">No drive data available for this device.</p>
+                    {% endif %}
+                </section>
+            {% endfor %}
+        </div>
+    </div>
+    <script>
+    document.querySelectorAll('details.drive-table').forEach(function(detailEl) {
+        const controls = detailEl.querySelectorAll('[data-column-toggle]');
+        controls.forEach(function(control) {
+            const columnKey = control.getAttribute('data-column-toggle');
+            const applyVisibility = function() {
+                const visible = control.checked;
+                detailEl.querySelectorAll('[data-column="' + columnKey + '"]').forEach(function(cell) {
+                    if (visible) {
+                        cell.classList.remove('hidden-column');
+                    } else {
+                        cell.classList.add('hidden-column');
+                    }
+                });
+            };
+            control.addEventListener('change', applyVisibility);
+            applyVisibility();
+        });
+    });
+    </script>
+</body>
+</html>

@@ -731,6 +731,7 @@ def main():
     parser.add_argument('--device-stats', action='store_true', help='Include version, branch, car fingerprint, and device ID columns in the summary table.')
     parser.add_argument('--speed-buckets', action='store_true', help='Show per-drive engagement breakdown by speed buckets in the summary table.')
     parser.add_argument('--vehicle-profile', type=str, help='Vehicle profile key defined in config/vehicle_profiles.json.')
+    parser.add_argument('--remote-device', type=str, help='SSH host alias from ~/.ssh/config to fetch remote drives from (overrides configuration).')
     args = parser.parse_args()
 
     # Map deprecated --overwrite to --reprocess
@@ -743,10 +744,13 @@ def main():
         return
 
     vehicle_decoder: Optional[VehicleSignalDecoder] = None
+    remote_device = args.remote_device
     vehicle_profiles = load_vehicle_profiles()
     if vehicle_profiles:
         profiles = vehicle_profiles.get('profiles', {})
         requested_profile = args.vehicle_profile or vehicle_profiles.get('default_profile')
+        if remote_device is None:
+            remote_device = vehicle_profiles.get('remote_device')
         if requested_profile:
             profile_cfg = profiles.get(requested_profile)
             if profile_cfg:
@@ -763,6 +767,9 @@ def main():
             print(f"⚠️ Vehicle profile '{args.vehicle_profile}' not available; continuing without DBC decoding.")
     elif args.vehicle_profile:
         print(f"⚠️ Vehicle profile configuration not found at {VEHICLE_PROFILE_CONFIG}; continuing without DBC decoding.")
+
+    if remote_device == "":
+        remote_device = None
 
     # Load or initialize historical engagement database
     if os.path.exists(ENGAGEMENT_DB_FILE):
@@ -981,20 +988,43 @@ def main():
                 engagement_db_modified = True
 
     if not selected_dongles:
-        # Original SSH-based processing
-        # Load SSH host config and manually override targets
         ssh_hosts, host_configurations = get_ssh_host_details()
-        if not ssh_hosts:
-            print("No SSH hosts found in .ssh/config.")
-            return
+        ssh_hosts = [h for h in ssh_hosts if h and not any(ch in h for ch in '*?')]
 
-        processed_devices = set()  # Track which devices we've already processed
-        ssh_hosts = ["C2", "C2_hotspot"]
+        target_hosts: List[str]
+        if remote_device:
+            if remote_device not in host_configurations:
+                print(f"⚠️ Remote device '{remote_device}' not found in ~/.ssh/config.")
+                if ssh_hosts:
+                    print("Available SSH hosts:")
+                    for host in ssh_hosts:
+                        print(f" - {host}")
+                print("Set the remote device in the configurator or pass --remote-device.")
+                return
+            target_hosts = [remote_device]
+        else:
+            if not ssh_hosts:
+                print("⚠️ No SSH hosts found in ~/.ssh/config. Set one via the configurator or pass --remote-device.")
+                return
+            if len(ssh_hosts) > 1:
+                print("⚠️ Multiple SSH hosts detected. Set a remote device in the configurator or pass --remote-device to choose one.")
+                print("Available SSH hosts:")
+                for host in ssh_hosts:
+                    print(f" - {host}")
+                return
+            target_hosts = ssh_hosts
+            remote_device = ssh_hosts[0]
 
-        # Loop through each SSH host
-        for host in ssh_hosts:
+        print(f"🌐 Using remote host: {remote_device}")
+
+        processed_devices = set()
+
+        for host in target_hosts:
             print(f"\n🚀 Processing host: {host}")
-            host_config = host_configurations[host]
+            host_config = host_configurations.get(host)
+            if not host_config:
+                print(f"⚠️ Missing configuration for host '{host}'. Skipping.")
+                continue
             ssh_host = host_config.get("HostName", host_config["Host"])
             ssh_port = host_config.get("Port", 22)
             ssh_username = host_config.get("User", "root")
@@ -1321,15 +1351,52 @@ def main():
     show_device_columns = getattr(args, 'device_stats', False)
     show_speed_rows = getattr(args, 'speed_buckets', False)
 
-    header_base = (
-        f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
-        f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
-        f"{'Steer':<6} {'ST/100km':<8} {'Press_s/h':<10} {'OPLong':<7}"
-    )
+    base_columns = [
+        ('Date/Time', 20, 'left'),
+        ('Dur (min)', 8, 'right'),
+        ('Drive (min)', 10, 'right'),
+        ('Dist (km)', 9, 'right'),
+        ('Eng (km)', 9, 'right'),
+        ('Time%', 7, 'right'),
+        ('Drive%', 7, 'right'),
+        ('ODO%', 7, 'right'),
+        ('Diseng', 7, 'right'),
+        ('Dis/100km', 10, 'right'),
+        ('Steer', 5, 'right'),
+        ('ST/100km', 10, 'right'),
+        ('Press s/h', 11, 'right'),
+        ('OPLong', 7, 'center'),
+    ]
+
+    device_columns = [
+        ('Version', 14, 'left'),
+        ('Branch', 16, 'left'),
+        ('Car', 18, 'left'),
+        ('Device', 8, 'left'),
+    ]
+
+    def _fmt_cell(value: Optional[str], width: int, align: str) -> str:
+        text = '' if value is None else str(value)
+        if len(text) > width:
+            text = text[:max(0, width - 1)] + ('…' if width > 1 else '')
+        if align == 'left':
+            return text.ljust(width)
+        if align == 'center':
+            return text.center(width)
+        return text.rjust(width)
+
+    columns = list(base_columns)
     if show_device_columns:
-        header_line = header_base + f" {'Version':<14} {'Branch':<16} {'Car':<20} {'Device':<12}"
-    else:
-        header_line = header_base
+        columns.extend(device_columns)
+
+    header_line = '  '.join(
+        _fmt_cell(
+            label,
+            width,
+            'center' if align == 'center' else ('right' if align == 'right' else 'left')
+        )
+        for (label, width, align) in columns
+    )
 
     line_width = max(120, len(header_line))
     separator = '-' * len(header_line)
@@ -1394,23 +1461,13 @@ def main():
                 
                 # Format the drive data in columns
                 date_time = drive.replace('--', ' ').replace('-', '/')
-                duration_str = f"{duration_minutes:.1f}min"
-                drive_duration_str = f"{drive_duration_minutes:.1f}min" if drive_duration_minutes > 0 else "0.0min"
-                distance_str = f"{stats.get('odo_distance', 0):.1f}km" if stats.get('odo_distance') else "N/A"
-                engaged_str = f"{stats.get('engaged_distance', 0):.1f}km" if stats.get('engaged_distance') else "0.0km"
-                time_pct_str = f"{percentage:.1f}%"
                 drive_pct_value = stats.get('drive_time_engagement_pct')
-                drive_pct_str = f"{drive_pct_value:.1f}%" if drive_pct_value is not None else "N/A"
                 odo_pct_value = stats.get('engagement_pct_odo')
-                odo_pct_str = f"{odo_pct_value:.1f}%" if odo_pct_value is not None else "N/A"
-                diseng_str = f"{stats.get('intervention_count', 0)}"
-                diseng_100km_value = stats.get('interventions_per_100km')
-                diseng_100km_str = f"{diseng_100km_value:.1f}" if diseng_100km_value is not None else "0.0"
-                steer_str = f"{stats.get('steer_intervention_count', 0)}"
-                steer_100km_value = stats.get('steer_interventions_per_100km')
-                steer_100km_str = f"{steer_100km_value:.1f}" if steer_100km_value is not None else "0.0"
-                press_s_per_hour = stats.get('cruise_press_seconds_per_hour')
-                press_s_per_hour_str = f"{press_s_per_hour:.2f}" if press_s_per_hour is not None else "0.00"
+                diseng_count = stats.get('intervention_count', 0) or 0
+                diseng_per_100_value = stats.get('interventions_per_100km')
+                steer_count = stats.get('steer_intervention_count', 0) or 0
+                steer_per_100_value = stats.get('steer_interventions_per_100km')
+                press_per_hour_value = stats.get('cruise_press_seconds_per_hour')
 
                 bucket_stats = stats.get('speed_buckets') or {}
                 for bucket_cfg in SPEED_BUCKETS:
@@ -1431,27 +1488,59 @@ def main():
                 else:
                     opl_display = '—'
 
-                row = (
-                    f"{date_time:<20} {duration_str:<11} {drive_duration_str:<11} {distance_str:<9} {engaged_str:<9} "
-                    f"{time_pct_str:<7} {drive_pct_str:<7} {odo_pct_str:<7} {diseng_str:<6} {diseng_100km_str:<9} {steer_str:<6} {steer_100km_str:<8} {press_s_per_hour_str:<10} {opl_display:<7}"
+                duration_cell = f"{duration_minutes:.1f}"
+                drive_duration_cell = f"{drive_duration_minutes:.1f}"
+                distance_value = stats.get('odo_distance')
+                distance_cell = f"{distance_value:.1f}" if distance_value is not None else 'N/A'
+                engaged_value = stats.get('engaged_distance')
+                engaged_distance_cell = f"{engaged_value:.1f}" if engaged_value is not None else 'N/A'
+                time_pct_cell = f"{percentage:.1f}"
+                drive_pct_cell = f"{drive_pct_value:.1f}" if drive_pct_value is not None else 'N/A'
+                odo_pct_cell = f"{odo_pct_value:.1f}" if odo_pct_value is not None else 'N/A'
+                diseng_per_100_cell = (
+                    f"{diseng_per_100_value:.1f}"
+                    if diseng_per_100_value is not None else '0.0'
                 )
+                steer_per_100_cell = (
+                    f"{steer_per_100_value:.1f}"
+                    if steer_per_100_value is not None else '0.0'
+                )
+                press_per_hour_cell = (
+                    f"{press_per_hour_value:.2f}"
+                    if press_per_hour_value is not None else '0.00'
+                )
+
+                row_cells = [
+                    _fmt_cell(date_time, 20, 'left'),
+                    _fmt_cell(duration_cell, 9, 'right'),
+                    _fmt_cell(drive_duration_cell, 11, 'right'),
+                    _fmt_cell(distance_cell, 10, 'right'),
+                    _fmt_cell(engaged_distance_cell, 10, 'right'),
+                    _fmt_cell(time_pct_cell, 6, 'right'),
+                    _fmt_cell(drive_pct_cell, 6, 'right'),
+                    _fmt_cell(odo_pct_cell, 6, 'right'),
+                    _fmt_cell(str(diseng_count), 6, 'right'),
+                    _fmt_cell(diseng_per_100_cell, 10, 'right'),
+                    _fmt_cell(str(steer_count), 5, 'right'),
+                    _fmt_cell(steer_per_100_cell, 10, 'right'),
+                    _fmt_cell(press_per_hour_cell, 11, 'right'),
+                    _fmt_cell(opl_display, 6, 'center'),
+                ]
 
                 if show_device_columns:
                     version_value = stats.get('version') or '—'
-                    version_display = version_value if len(version_value) <= 14 else version_value[:13] + '…'
-
                     branch_value = stats.get('git_branch') or '—'
-                    branch_display = branch_value if len(branch_value) <= 16 else branch_value[:15] + '…'
-
                     car_value = stats.get('car_fingerprint') or '—'
-                    car_display = car_value if len(car_value) <= 20 else car_value[:19] + '…'
-
                     device_value = stats.get('device_type') or '—'
-                    device_display = device_value if len(device_value) <= 12 else device_value[:11] + '…'
 
-                    row += f" {version_display:<14} {branch_display:<16} {car_display:<20} {device_display:<12}"
+                    row_cells.extend([
+                        _fmt_cell(version_value, 14, 'left'),
+                        _fmt_cell(branch_value, 16, 'left'),
+                        _fmt_cell(car_value, 20, 'left'),
+                        _fmt_cell(device_value, 12, 'left'),
+                    ])
 
-                print(row)
+                print('  '.join(row_cells))
 
                 if show_speed_rows:
                     bucket_stats = stats.get('speed_buckets') or {}

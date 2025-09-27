@@ -138,6 +138,22 @@ class EngagementRepository:
         total_engaged_distance = _safe_sum([row.get('engaged_distance') for row in rows])
         total_drive_time_hours = sum(_ns_to_hours(row.get('drive_time')) for row in rows)
         total_active_time_hours = sum(_ns_to_hours(row.get('drive_time_active')) for row in rows)
+        total_time_hours = sum(_ns_to_hours(row.get('total_time')) for row in rows)
+        total_interventions = sum(int(row.get('intervention_count') or 0) for row in rows)
+        total_steer_interventions = sum(int(row.get('steer_intervention_count') or 0) for row in rows)
+
+        overall_engagement_pct = (
+            total_engaged_distance / total_distance * 100 if total_distance > 0 else None
+        )
+        overall_time_engagement_pct = (
+            total_active_time_hours / total_time_hours * 100 if total_time_hours > 0 else None
+        )
+        total_interventions_per_100km = (
+            total_interventions / total_distance * 100 if total_distance > 0 else None
+        )
+        total_steer_interventions_per_100km = (
+            total_steer_interventions / total_distance * 100 if total_distance > 0 else None
+        )
 
         timestamps = [_parse_drive_timestamp(row.get('drive')) for row in rows]
         timestamps = [ts for ts in timestamps if ts is not None]
@@ -154,6 +170,13 @@ class EngagementRepository:
             'total_engaged_distance_km': round(total_engaged_distance, 2),
             'total_drive_time_hours': round(total_drive_time_hours, 2),
             'total_active_time_hours': round(total_active_time_hours, 2),
+            'total_time_hours': round(total_time_hours, 2),
+            'overall_engagement_pct': round(overall_engagement_pct, 2) if overall_engagement_pct is not None else None,
+            'overall_time_engagement_pct': round(overall_time_engagement_pct, 2) if overall_time_engagement_pct is not None else None,
+            'total_intervention_count': total_interventions,
+            'total_interventions_per_100km': round(total_interventions_per_100km, 2) if total_interventions_per_100km is not None else None,
+            'total_steer_intervention_count': total_steer_interventions,
+            'total_steer_interventions_per_100km': round(total_steer_interventions_per_100km, 2) if total_steer_interventions_per_100km is not None else None,
             'first_drive': first_drive,
             'latest_drive': latest_drive,
         }
@@ -176,6 +199,7 @@ class EngagementRepository:
                 'steer_intervention_count': row.get('steer_intervention_count'),
                 'steer_interventions_per_100km': row.get('steer_interventions_per_100km'),
                 'cruise_press_seconds': row.get('cruise_press_seconds'),
+                'cruise_press_seconds_per_hour': row.get('cruise_press_seconds_per_hour'),
                 'openpilot_longitudinal': row.get('openpilot_longitudinal'),
                 'car_fingerprint': row.get('car_fingerprint'),
                 'device_type': row.get('device_type'),
@@ -189,13 +213,51 @@ class EngagementRepository:
 
 
     def cli_summary(self, include_device_columns: bool = False) -> str:
-        header = (
-            f"{'Date/Time':<20} {'Duration':<11} {'DriveDur':<11} {'Distance':<9} {'Engaged':<9} "
-            f"{'Time%':<7} {'Drive%':<7} {'ODO%':<7} {'Diseng':<6} {'DIS/100km':<9} "
-            f"{'Steer':<6} {'ST/100km':<8} {'Press_s/h':<10}"
-        )
+        base_columns = [
+            ('Date/Time', 20, 'left'),
+            ('Dur (min)', 9, 'right'),
+            ('Drive (min)', 11, 'right'),
+            ('Dist (km)', 10, 'right'),
+            ('Eng (km)', 10, 'right'),
+            ('Time %', 7, 'right'),
+            ('Drive %', 7, 'right'),
+            ('ODO %', 6, 'right'),
+            ('Diseng', 6, 'right'),
+            ('Dis/100km', 11, 'right'),
+            ('Steer', 5, 'right'),
+            ('ST/100km', 11, 'right'),
+            ('Press s/h', 12, 'right'),
+            ('OPLong', 7, 'left'),
+        ]
+        device_columns = [
+            ('Version', 16, 'left'),
+            ('Branch', 18, 'left'),
+            ('Car', 24, 'left'),
+            ('Device', 10, 'left'),
+        ]
+
+        def _fmt_cell(value: Optional[str], width: int, align: str) -> str:
+            text = '' if value is None else str(value)
+            if len(text) > width:
+                text = text[:max(0, width - 1)] + ('…' if width > 1 else '')
+            if align == 'left':
+                return text.ljust(width)
+            if align == 'center':
+                return text.center(width)
+            return text.rjust(width)
+
+        columns = list(base_columns)
         if include_device_columns:
-            header += f" {'OPLong':<7} {'Version':<14} {'Branch':<16} {'Car':<20} {'Device':<12}"
+            columns.extend(device_columns)
+
+        header = '  '.join(
+            _fmt_cell(
+                label,
+                width,
+                'center' if align == 'center' else ('right' if align == 'right' else 'left')
+            )
+            for (label, width, align) in columns
+        )
 
         line_width = max(120, len(header))
         separator = '-' * len(header)
@@ -275,8 +337,8 @@ class EngagementRepository:
                 total_cruise_press_time_ns += cruise_press_time_ns
 
                 duration_minutes = total_time_ns / 1e9 / 60
-                drive_duration_minutes = drive_time_ns / 1e9 / 60
-                time_pct = (active_time_ns / total_time_ns * 100) if total_time_ns else 0
+                drive_duration_minutes = drive_time_ns / 1e9 / 60 if drive_time_ns else 0.0
+                time_pct = (active_time_ns / total_time_ns * 100) if total_time_ns else 0.0
                 drive_pct = (
                     drive.get('drive_time_engagement_pct')
                     if drive.get('drive_time_engagement_pct') is not None
@@ -287,16 +349,17 @@ class EngagementRepository:
                 steer_per_100km = drive.get('steer_interventions_per_100km')
                 press_seconds_per_hour = drive.get('cruise_press_seconds_per_hour')
 
-                drive_display = drive_name.replace('--', ' ').replace('-', '/')[:20]
-                row = (
-                    f"{drive_display:<20} {duration_minutes:>6.1f}min {drive_duration_minutes:>6.1f}min "
-                    f"{distance_km:>6.1f}km {engaged_distance_km:>7.1f}km "
-                    f"{time_pct:>5.1f}% {(_format_pct(drive_pct, 1) if drive_pct is not None else 'N/A'):>7} "
-                    f"{(_format_pct(odo_pct, 1) if odo_pct is not None else 'N/A'):>7} "
-                    f"{disengagements:>6} {diseng_per_100km or 0:>9.1f} "
-                    f"{steer_interventions:>6} {steer_per_100km or 0:>8.1f} "
-                    f"{press_seconds_per_hour or 0:>10.2f}"
-                )
+                drive_display = drive_name.replace('--', ' ').replace('-', '/')
+                duration_cell = f"{duration_minutes:.1f}"
+                drive_duration_cell = f"{drive_duration_minutes:.1f}"
+                distance_cell = f"{distance_km:.1f}"
+                engaged_distance_cell = f"{engaged_distance_km:.1f}"
+                time_pct_cell = f"{time_pct:.1f}"
+                drive_pct_cell = f"{drive_pct:.1f}" if drive_pct is not None else 'N/A'
+                odo_pct_cell = f"{odo_pct:.1f}" if odo_pct is not None else 'N/A'
+                diseng_per_100_cell = f"{(diseng_per_100km or 0):.1f}"
+                steer_per_100_cell = f"{(steer_per_100km or 0):.1f}"
+                press_per_hour_cell = f"{(press_seconds_per_hour or 0):.2f}"
 
                 if include_device_columns:
                     opl = drive.get('openpilot_longitudinal')
@@ -308,23 +371,45 @@ class EngagementRepository:
                         opl_display = '—'
 
                     version_value = drive.get('version') or '—'
-                    if len(version_value) > 14:
-                        version_value = version_value[:13] + '…'
                     branch_value = drive.get('git_branch') or '—'
-                    if len(branch_value) > 16:
-                        branch_value = branch_value[:15] + '…'
                     car_value = drive.get('car_fingerprint') or '—'
-                    if len(car_value) > 20:
-                        car_value = car_value[:19] + '…'
                     device_value = drive.get('device_type') or '—'
-                    if len(device_value) > 12:
-                        device_value = device_value[:11] + '…'
+                else:
+                    opl = drive.get('openpilot_longitudinal')
+                    if opl is True:
+                        opl_display = 'ON'
+                    elif opl is False:
+                        opl_display = 'OFF'
+                    else:
+                        opl_display = '—'
+                    version_value = branch_value = car_value = device_value = None
 
-                    row += (
-                        f" {opl_display:<7} {version_value:<14} {branch_value:<16} {car_value:<20} {device_value:<12}"
-                    )
+                row_cells = [
+                    _fmt_cell(drive_display, 20, 'left'),
+                    _fmt_cell(duration_cell, 9, 'right'),
+                    _fmt_cell(drive_duration_cell, 11, 'right'),
+                    _fmt_cell(distance_cell, 10, 'right'),
+                    _fmt_cell(engaged_distance_cell, 10, 'right'),
+                    _fmt_cell(time_pct_cell, 6, 'right'),
+                    _fmt_cell(drive_pct_cell, 6, 'right'),
+                    _fmt_cell(odo_pct_cell, 6, 'right'),
+                    _fmt_cell(str(disengagements), 6, 'right'),
+                    _fmt_cell(diseng_per_100_cell, 10, 'right'),
+                    _fmt_cell(str(steer_interventions), 5, 'right'),
+                    _fmt_cell(steer_per_100_cell, 10, 'right'),
+                    _fmt_cell(press_per_hour_cell, 12, 'right'),
+                    _fmt_cell(opl_display, 7, 'right'),
+                ]
 
-                lines.append(row)
+                if include_device_columns:
+                    row_cells.extend([
+                        _fmt_cell(version_value, 14, 'left'),
+                        _fmt_cell(branch_value, 16, 'left'),
+                        _fmt_cell(car_value, 20, 'left'),
+                        _fmt_cell(device_value, 12, 'left'),
+                    ])
+
+                lines.append('  '.join(row_cells))
 
                 bucket_stats = drive.get('speed_buckets') or {}
                 for bucket_cfg in SPEED_BUCKETS:

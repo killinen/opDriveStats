@@ -11,6 +11,8 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import cantools
 
+from lib.helpers import get_ssh_host_details
+
 
 CONFIG_PATH = "config/vehicle_profiles.json"
 DBC_DIR = "DBC"
@@ -54,10 +56,14 @@ class AppState:
 
 def load_config(path: str) -> Dict[str, Any]:
     if not os.path.exists(path):
-        return {"default_profile": "", "profiles": {}}
+        return {"default_profile": "", "profiles": {}, "remote_device": ""}
     try:
         with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
+            data = json.load(handle)
+            data.setdefault("default_profile", "")
+            data.setdefault("profiles", {})
+            data.setdefault("remote_device", "")
+            return data
     except json.JSONDecodeError as exc:
         raise SystemExit(f"Unable to parse {path}: {exc}")
 
@@ -68,6 +74,7 @@ def save_config(path: str, state: AppState) -> None:
     payload = {
         "default_profile": state.config.get("default_profile", ""),
         "profiles": ordered_profiles,
+        "remote_device": state.config.get("remote_device", ""),
     }
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
@@ -110,6 +117,96 @@ def sanitize_dbc_contents(text: str) -> str:
         else:
             sanitized_lines.append(line)
     return "\n".join(sanitized_lines)
+
+
+def list_ssh_hosts() -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
+    hosts, host_cfg = get_ssh_host_details()
+    filtered = []
+    for host in hosts:
+        if not host or any(ch in host for ch in "*?"):
+            continue
+        filtered.append(host)
+    filtered = sorted(dict.fromkeys(filtered))
+    return filtered, host_cfg
+
+
+def choose_remote_host(
+    stdscr: "curses._CursesWindow",
+    current_host: Optional[str],
+) -> Optional[str]:
+    hosts, host_cfg = list_ssh_hosts()
+
+    if not hosts:
+        return prompt_string(stdscr, "SSH host alias", current_host or "")
+
+    selected = 0
+    if current_host and current_host in hosts:
+        selected = hosts.index(current_host)
+
+    status = "Enter: select  T:type custom  C:clear  B:back"
+    start = 0
+
+    while True:
+        stdscr.erase()
+        height, width = stdscr.getmaxyx()
+        stdscr.bkgd(" ", curses.color_pair(1))
+
+        header = " Select SSH Host "
+        stdscr.attron(curses.color_pair(3) | curses.A_BOLD)
+        stdscr.addnstr(0, max(0, (width - len(header)) // 2), header, width - 2)
+        stdscr.attroff(curses.color_pair(3) | curses.A_BOLD)
+
+        max_rows = max(1, height - 6)
+        max_start = max(0, len(hosts) - max_rows)
+        bottom_margin = 1
+        top_margin = 1
+        if selected > start + max_rows - 1 - bottom_margin:
+            start = min(max_start, selected - (max_rows - 1 - bottom_margin))
+        if selected < start + top_margin:
+            start = max(0, selected - top_margin)
+        start = max(0, min(start, max_start))
+
+        for row, host in enumerate(hosts[start : start + max_rows]):
+            y = 2 + row
+            attr = curses.A_BOLD if (start + row) == selected else curses.A_NORMAL
+            color = curses.color_pair(2) if (start + row) == selected else curses.color_pair(1)
+            stdscr.attrset(attr | color)
+            cfg = host_cfg.get(host, {})
+            parts: List[str] = []
+            hostname = cfg.get("HostName")
+            user = cfg.get("User")
+            if user or hostname:
+                login = hostname or host
+                if user:
+                    login = f"{user}@{login}"
+                parts.append(login)
+            port = cfg.get("Port")
+            if port:
+                parts.append(f"port {port}")
+            display = host
+            if parts:
+                display += " (" + ", ".join(parts) + ")"
+            stdscr.addnstr(y, 2, display.ljust(width - 4), width - 4)
+
+        stdscr.attrset(curses.color_pair(3))
+        stdscr.addnstr(height - 2, 2, status.ljust(width - 4), width - 4)
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key in (ord("b"), ord("B"), 27):
+            return current_host
+        if key in (curses.KEY_UP, ord("k")):
+            selected = (selected - 1) % len(hosts)
+        elif key in (curses.KEY_DOWN, ord("j")):
+            selected = (selected + 1) % len(hosts)
+        elif key in (ord("t"), ord("T")):
+            manual = prompt_string(stdscr, "SSH host alias", current_host or "")
+            return manual
+        elif key in (ord("c"), ord("C")):
+            return ""
+        elif key in (curses.KEY_ENTER, 10, 13):
+            return hosts[selected]
+
 
 
 def load_dbc_catalog(path: str) -> Optional[List[Dict[str, Any]]]:
@@ -214,7 +311,7 @@ def draw_main(stdscr: "curses._CursesWindow", state: AppState) -> None:
     stdscr.addnstr(0, max(0, (width - len(title)) // 2), title, width - 2)
     stdscr.attroff(curses.color_pair(3) | curses.A_BOLD)
 
-    help_line = "Arrows: navigate  A:add profile  O:edit DBC/details  E:map signals  D:delete  S:set default  W:save config  Q:quit"
+    help_line = "Arrows: navigate  A:add profile  O:edit DBC/details  E:map signals  D:delete  S:set default  W:save config  R:remote host  Q:quit"
     stdscr.attron(curses.color_pair(3))
     stdscr.addnstr(1, 2, help_line, width - 4)
     stdscr.attroff(curses.color_pair(3))
@@ -239,6 +336,11 @@ def draw_main(stdscr: "curses._CursesWindow", state: AppState) -> None:
         stdscr.addnstr(y, 2, entry.ljust(list_width - 2), list_width - 2)
         stdscr.attrset(curses.color_pair(1))
 
+    remote_host = state.config.get("remote_device") or "(not set)"
+    detail_row = 5
+    stdscr.addnstr(detail_row, detail_x, f"Remote SSH host: {remote_host}", width - detail_x - 2)
+    detail_row += 2
+
     selected_name = state.selected_profile_name()
     if selected_name:
         profile = state.profiles[selected_name]
@@ -248,13 +350,15 @@ def draw_main(stdscr: "curses._CursesWindow", state: AppState) -> None:
             f"DBC file: {profile.get('dbc_file', '')}",
             "Signals:",
         ]
-        row = 5
+        row = detail_row
         for line in lines:
+            if row >= height - 4:
+                break
             stdscr.addnstr(row, detail_x, line, width - detail_x - 2)
             row += 1
 
         signals = profile.get("signals", {})
-        if not signals:
+        if not signals and row < height - 4:
             stdscr.addnstr(row, detail_x + 2, "(none)", width - detail_x - 4)
         else:
             for key in sorted(signals.keys()):
@@ -271,6 +375,8 @@ def draw_main(stdscr: "curses._CursesWindow", state: AppState) -> None:
                     text = prefix + explain_entry(entry)
                     stdscr.addnstr(row, detail_x + 2, text, width - detail_x - 4)
                     row += 1
+    else:
+        stdscr.addnstr(detail_row, detail_x, "Select a profile to view details.", width - detail_x - 2)
 
     status_color = curses.color_pair(4 if state.dirty else 3)
     stdscr.attron(status_color)
@@ -392,6 +498,22 @@ def set_default_profile(state: AppState) -> None:
     state.config["default_profile"] = name
     state.dirty = True
     state.status = f"Default profile set to '{name}'"
+
+
+def set_remote_device(stdscr: "curses._CursesWindow", state: AppState) -> None:
+    current = state.config.get("remote_device", "")
+    choice = choose_remote_host(stdscr, current)
+    if choice is None:
+        state.status = "Remote host unchanged"
+        return
+    if choice == current:
+        label = choice or "(not set)"
+        state.status = f"Remote host unchanged ({label})"
+        return
+    state.config["remote_device"] = choice
+    state.dirty = True
+    label = choice or "(not set)"
+    state.status = f"Remote host set to '{label}'"
 
 
 def edit_profile_details(stdscr: "curses._CursesWindow", state: AppState) -> None:
@@ -816,8 +938,11 @@ def main(stdscr: "curses._CursesWindow") -> None:
         elif key in (ord("e"), ord("E")):
             edit_signals(stdscr, state)
 
+        elif key in (ord("r"), ord("R")):
+            set_remote_device(stdscr, state)
+
         elif key in (ord("?"), ord("h"), ord("H")):
-            state.status = "A:add  O:details  E:signals  W:write  Q:quit"
+            state.status = "A:add  O:details  E:signals  R:remote host  W:write  Q:quit"
 
         else:
             key_name = curses.keyname(key).decode("utf-8", errors="replace") if key != -1 else "?"
