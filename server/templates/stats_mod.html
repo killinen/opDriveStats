@@ -340,6 +340,16 @@
                             </div>
                         </div>
                         <div class="metric">
+                            <div class="metric-label">Steering Interventions /100km</div>
+                            <div class="metric-value">
+                                {% if summary.total_steer_interventions_per_100km is not none %}
+                                    {{ summary.total_steer_interventions_per_100km | round(2) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="metric">
                             <div class="metric-label">Total Disengagements</div>
                             <div class="metric-value">{{ summary.total_intervention_count }}</div>
                         </div>

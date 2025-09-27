@@ -151,8 +151,16 @@ class EngagementRepository:
         total_interventions_per_100km = (
             total_interventions / total_distance * 100 if total_distance > 0 else None
         )
+
+        STEER_INTERVENTION_START_DATE = datetime(2025, 7, 7, tzinfo=timezone.utc)
+        total_steer_intervention_km = 0.0
+        for row in rows:
+            drive_date = _parse_drive_timestamp(row.get('drive'))
+            if drive_date and drive_date >= STEER_INTERVENTION_START_DATE:
+                total_steer_intervention_km += row.get('odo_distance') or 0.0
+
         total_steer_interventions_per_100km = (
-            total_steer_interventions / total_distance * 100 if total_distance > 0 else None
+            total_steer_interventions / total_steer_intervention_km * 100 if total_steer_intervention_km > 0 else None
         )
 
         timestamps = [_parse_drive_timestamp(row.get('drive')) for row in rows]
@@ -179,6 +187,7 @@ class EngagementRepository:
             'total_steer_interventions_per_100km': round(total_steer_interventions_per_100km, 2) if total_steer_interventions_per_100km is not None else None,
             'first_drive': first_drive,
             'latest_drive': latest_drive,
+            'total_steer_intervention_km': total_steer_intervention_km,
         }
 
     def format_drive_details(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -295,6 +304,7 @@ class EngagementRepository:
             total_engaged_distance = 0.0
             total_interventions = 0
             total_steer_interventions = 0
+            total_steer_intervention_km = 0.0
             total_cruise_press_time_ns = 0
             bucket_totals = {
                 bucket['key']: {
@@ -335,6 +345,11 @@ class EngagementRepository:
                 total_interventions += disengagements
                 total_steer_interventions += steer_interventions
                 total_cruise_press_time_ns += cruise_press_time_ns
+
+                STEER_INTERVENTION_START_DATE = datetime(2025, 7, 7, tzinfo=timezone.utc)
+                drive_date = _parse_drive_timestamp(drive.get('drive'))
+                if drive_date and drive_date >= STEER_INTERVENTION_START_DATE:
+                    total_steer_intervention_km += distance_km
 
                 duration_minutes = total_time_ns / 1e9 / 60
                 drive_duration_minutes = drive_time_ns / 1e9 / 60 if drive_time_ns else 0.0
@@ -437,7 +452,7 @@ class EngagementRepository:
                 (total_interventions / total_distance * 100) if total_distance else 0.0
             )
             total_steer_interventions_per_100km = (
-                (total_steer_interventions / total_distance * 100) if total_distance else 0.0
+                (total_steer_interventions / total_steer_intervention_km * 100) if total_steer_intervention_km else 0.0
             )
             lines.append('📈 TOTALS:')
             lines.append(f"   • Total Distance: {total_distance:.1f} km")
@@ -501,5 +516,49 @@ class EngagementRepository:
             lines.append('=' * line_width)
 
         return '\n'.join(lines)
+
+    def grand_total_summary(self) -> Dict[str, Any]:
+        summaries = self.device_summaries()
+        if not summaries:
+            return {}
+
+        grand_total_distance_km = sum(s.get('total_distance_km', 0) for s in summaries)
+        grand_total_engaged_distance_km = sum(s.get('total_engaged_distance_km', 0) for s in summaries)
+        grand_total_drive_time_hours = sum(s.get('total_drive_time_hours', 0) for s in summaries)
+        grand_total_active_time_hours = sum(s.get('total_active_time_hours', 0) for s in summaries)
+        grand_total_time_hours = sum(s.get('total_time_hours', 0) for s in summaries)
+        grand_total_intervention_count = sum(s.get('total_intervention_count', 0) for s in summaries)
+        grand_total_steer_intervention_count = sum(s.get('total_steer_intervention_count', 0) for s in summaries)
+        grand_total_steer_intervention_km = sum(s.get('total_steer_intervention_km', 0) for s in summaries)
+        drive_count = sum(s.get('drive_count', 0) for s in summaries)
+
+        overall_engagement_pct = (
+            grand_total_engaged_distance_km / grand_total_distance_km * 100 if grand_total_distance_km > 0 else None
+        )
+        overall_time_engagement_pct = (
+            grand_total_active_time_hours / grand_total_time_hours * 100 if grand_total_time_hours > 0 else None
+        )
+        total_interventions_per_100km = (
+            grand_total_intervention_count / grand_total_distance_km * 100 if grand_total_distance_km > 0 else None
+        )
+        total_steer_interventions_per_100km = (
+            grand_total_steer_intervention_count / grand_total_steer_intervention_km * 100 if grand_total_steer_intervention_km > 0 else None
+        )
+
+        return {
+            'drive_count': drive_count,
+            'total_distance_km': round(grand_total_distance_km, 2),
+            'total_engaged_distance_km': round(grand_total_engaged_distance_km, 2),
+            'total_drive_time_hours': round(grand_total_drive_time_hours, 2),
+            'total_active_time_hours': round(grand_total_active_time_hours, 2),
+            'total_time_hours': round(grand_total_time_hours, 2),
+            'overall_engagement_pct': round(overall_engagement_pct, 2) if overall_engagement_pct is not None else None,
+            'overall_time_engagement_pct': round(overall_time_engagement_pct, 2) if overall_time_engagement_pct is not None else None,
+            'total_intervention_count': grand_total_intervention_count,
+            'total_interventions_per_100km': round(total_interventions_per_100km, 2) if total_interventions_per_100km is not None else None,
+            'total_steer_intervention_count': grand_total_steer_intervention_count,
+            'total_steer_interventions_per_100km': round(total_steer_interventions_per_100km, 2) if total_steer_interventions_per_100km is not None else None,
+        }
+
 
 repository = EngagementRepository()

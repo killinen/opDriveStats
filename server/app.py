@@ -78,3 +78,14 @@ def stats_mod_view(request: Request) -> HTMLResponse:
         'last_loaded': repository.last_updated(),
     }
     return templates.TemplateResponse('stats_mod.html', context)
+
+
+@app.get('/total_stats', summary='Modern engagement dashboard with totals', response_class=HTMLResponse)
+def total_stats_view(request: Request) -> HTMLResponse:
+    summary = repository.grand_total_summary()
+    context = {
+        'request': request,
+        'summary': summary,
+        'last_loaded': repository.last_updated(),
+    }
+    return templates.TemplateResponse('total_stats.html', context)
