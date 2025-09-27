@@ -48,6 +48,7 @@ SFTP_RETRY_DELAY = 5
 VEGO_MOVING_THRESHOLD = 1.0
 BACKUP_DIR = 'database_backups'
 VEHICLE_PROFILE_CONFIG = 'config/vehicle_profiles.json'
+STEER_INTERVENTION_START_DATE = datetime(2025, 7, 7)
 
 SPEED_BUCKETS = [
     {
@@ -399,7 +400,7 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
         drive_timestamp_str = parse_drive_timestamp(drive_name)
         if drive_timestamp_str:
             drive_date = datetime.fromisoformat(drive_timestamp_str)
-            enable_intervention_check = drive_date >= datetime(2025, 7, 7)
+            enable_intervention_check = drive_date >= STEER_INTERVENTION_START_DATE
         else:
             enable_intervention_check = False
 
@@ -1423,6 +1424,7 @@ def main():
         total_distance = 0
         total_engaged_distance = 0
         total_cruise_press_time_ns = 0
+        total_steer_intervention_km = 0
         bucket_aggregate = {bucket['key']: {'time': 0, 'engaged_time': 0, 'distance': 0.0, 'engaged_distance': 0.0} for bucket in SPEED_BUCKETS}
 
         sorted_drives = sorted(
@@ -1448,6 +1450,12 @@ def main():
                 total_steer_interventions += stats['steer_intervention_count']
             if stats.get('odo_distance') is not None:
                 total_distance += stats['odo_distance']
+
+                drive_timestamp_str = parse_drive_timestamp(drive)
+                if drive_timestamp_str:
+                    drive_date = datetime.fromisoformat(drive_timestamp_str)
+                    if drive_date >= STEER_INTERVENTION_START_DATE:
+                        total_steer_intervention_km += stats['odo_distance']
             if stats.get('engaged_distance') is not None:
                 total_engaged_distance += stats['engaged_distance']
             if stats.get('cruise_press_time_ns') is not None:
@@ -1579,7 +1587,7 @@ def main():
             )
             # Calculate overall intervention rate
             total_interventions_per_100km = (total_interventions / total_distance * 100) if total_distance > 0 else 0
-            total_steer_interventions_per_100km = (total_steer_interventions / total_distance * 100) if total_distance > 0 else 0
+            total_steer_interventions_per_100km = (total_steer_interventions / total_steer_intervention_km * 100) if total_steer_intervention_km > 0 else 0
             
             print(f"📈 TOTALS:")
             print(f"   • Total Distance: {total_distance:.1f} km")

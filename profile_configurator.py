@@ -6,7 +6,9 @@ from __future__ import annotations
 import curses
 import json
 import os
-from dataclasses import dataclass
+import shlex
+import subprocess
+from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Tuple
 
 import cantools
@@ -35,6 +37,7 @@ class AppState:
     selected_index: int = 0
     dirty: bool = False
     status: str = "Press ? for help"
+    remote_dbc_cache: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     @property
     def profiles(self) -> Dict[str, Any]:
@@ -511,6 +514,7 @@ def set_remote_device(stdscr: "curses._CursesWindow", state: AppState) -> None:
         state.status = f"Remote host unchanged ({label})"
         return
     state.config["remote_device"] = choice
+    state.remote_dbc_cache.clear()
     state.dirty = True
     label = choice or "(not set)"
     state.status = f"Remote host set to '{label}'"
@@ -526,11 +530,17 @@ def edit_profile_details(stdscr: "curses._CursesWindow", state: AppState) -> Non
     if description is None:
         state.status = "Edit cancelled"
         return
-    dbc_file = choose_dbc_file(stdscr, profile.get("dbc_file"))
+    remote_lookup = fetch_remote_dbc_lookup(state)
+    dbc_file, fingerprints = choose_dbc_file(stdscr, profile.get("dbc_file"), remote_lookup)
     if dbc_file is None:
         dbc_file = profile.get("dbc_file", "")
     profile["description"] = description
     profile["dbc_file"] = dbc_file
+    if fingerprints is not None:
+        if fingerprints:
+            profile["fingerprints"] = sorted(set(fingerprints))
+        else:
+            profile.pop("fingerprints", None)
     state.dirty = True
     state.status = f"Updated profile '{name}'"
 
@@ -727,16 +737,46 @@ def prompt_signal_overrides(
 def choose_dbc_file(
     stdscr: "curses._CursesWindow",
     current_path: Optional[str],
-) -> Optional[str]:
+    remote_options: Optional[Dict[str, Dict[str, Any]]],
+) -> Tuple[Optional[str], Optional[List[str]]]:
     files = list_dbc_files()
-    if not files:
-        return prompt_string(stdscr, "DBC file path", current_path or "")
+    options: List[Dict[str, Any]] = []
+
+    if remote_options:
+        for dbc_name, info in sorted(remote_options.items()):
+            fingerprints = info.get('fingerprints', [])
+            makes = info.get('makes', [])
+            make_text = f" ({', '.join(makes)})" if makes else ""
+            label = f"[remote] {dbc_name}.dbc [{len(fingerprints)} fingerprints]{make_text}"
+            options.append({
+                'type': 'remote',
+                'label': label,
+                'dbc_name': dbc_name,
+                'fingerprints': fingerprints,
+            })
+
+    for fname in files:
+        options.append({
+            'type': 'local',
+            'label': fname,
+            'dbc_name': os.path.splitext(fname)[0],
+            'fingerprints': None,
+        })
+
+    if not options:
+        manual = prompt_string(stdscr, "DBC file path", current_path or "")
+        return manual, None
 
     selected = 0
     if current_path:
-        current_name = os.path.basename(current_path)
-        if current_name in files:
-            selected = files.index(current_name)
+        base = os.path.basename(current_path)
+        for idx, option in enumerate(options):
+            if option['type'] == 'remote' and f"{option['dbc_name']}.dbc" == base:
+                selected = idx
+                break
+            if option['type'] == 'local' and option['label'] == base:
+                selected = idx
+                break
 
     status = "Enter: select  T:type custom  B:back"
     start = 0
@@ -752,11 +792,12 @@ def choose_dbc_file(
         stdscr.attroff(curses.color_pair(3) | curses.A_BOLD)
 
         stdscr.attron(curses.color_pair(3))
-        stdscr.addnstr(1, 2, f"Directory: {DBC_DIR}", width - 4)
+        stdscr.addnstr(1, 2, f"Directory: {DBC_DIR} (remote options first)", width - 4)
         stdscr.attroff(curses.color_pair(3))
 
+        total = len(options)
         max_rows = max(1, height - 5)
-        max_start = max(0, len(files) - max_rows)
+        max_start = max(0, total - max_rows)
         bottom_margin = 1
         top_margin = 1
         if selected > start + max_rows - 1 - bottom_margin:
@@ -765,12 +806,12 @@ def choose_dbc_file(
             start = max(0, selected - top_margin)
         start = max(0, min(start, max_start))
 
-        for row, fname in enumerate(files[start : start + max_rows]):
+        for row, option in enumerate(options[start : start + max_rows]):
             y = 3 + row
             attr = curses.A_BOLD if (start + row) == selected else curses.A_NORMAL
             color = curses.color_pair(2) if (start + row) == selected else curses.color_pair(1)
             stdscr.attrset(attr | color)
-            stdscr.addnstr(y, 2, fname.ljust(width - 4), width - 4)
+            stdscr.addnstr(y, 2, option['label'][: width - 4].ljust(width - 4), width - 4)
 
         stdscr.attrset(curses.color_pair(3))
         stdscr.addnstr(height - 2, 2, status.ljust(width - 4), width - 4)
@@ -778,16 +819,22 @@ def choose_dbc_file(
 
         key = stdscr.getch()
         if key in (ord("b"), ord("B"), 27):
-            return current_path
+            return current_path, None
         if key in (curses.KEY_UP, ord("k")):
-            selected = (selected - 1) % len(files)
+            selected = (selected - 1) % total
         elif key in (curses.KEY_DOWN, ord("j")):
-            selected = (selected + 1) % len(files)
+            selected = (selected + 1) % total
         elif key in (ord("t"), ord("T")):
             manual = prompt_string(stdscr, "DBC file path", current_path or "")
-            return manual
+            return manual, None
         elif key in (curses.KEY_ENTER, 10, 13):
-            return os.path.join(DBC_DIR, files[selected])
+            choice = options[selected]
+            if choice['type'] == 'remote':
+                dbc_name = choice['dbc_name']
+                local_path = os.path.join(DBC_DIR, f"{dbc_name}.dbc")
+                return local_path, choice['fingerprints']
+            else:
+                return os.path.join(DBC_DIR, choice['label']), None
 
 
 def choose_message_signal(
