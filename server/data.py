@@ -168,7 +168,45 @@ class EngagementRepository:
         first_drive = min(timestamps).isoformat() if timestamps else None
         latest_drive = max(timestamps).isoformat() if timestamps else None
 
+        bucket_aggregate = {
+            bucket['key']: {'time_ns': 0, 'engaged_time_ns': 0, 'distance_km': 0.0, 'engaged_distance_km': 0.0}
+            for bucket in SPEED_BUCKETS
+        }
+
+        for row in rows:
+            row_buckets = row.get('speed_buckets') or {}
+            for key, data in row_buckets.items():
+                if key in bucket_aggregate:
+                    bucket_aggregate[key]['time_ns'] += data.get('time_ns', 0)
+                    bucket_aggregate[key]['engaged_time_ns'] += data.get('engaged_time_ns', 0)
+                    bucket_aggregate[key]['distance_km'] += data.get('distance_km_raw', 0.0)
+                    bucket_aggregate[key]['engaged_distance_km'] += data.get('engaged_distance_km_raw', 0.0)
+        
+        speed_bucket_summary = {}
+        for bucket_cfg in SPEED_BUCKETS:
+            key = bucket_cfg['key']
+            data = bucket_aggregate[key]
+            total_time_min = data['time_ns'] / 1e9 / 60
+            engaged_time_min = data['engaged_time_ns'] / 1e9 / 60
+            engagement_pct = (data['engaged_time_ns'] / data['time_ns'] * 100) if data['time_ns'] > 0 else None
+            dist_engagement_pct = (data['engaged_distance_km'] / data['distance_km'] * 100) if data['distance_km'] > 0 else None
+
+            speed_bucket_summary[key] = {
+                'label': bucket_cfg['label'],
+                'time_min': round(total_time_min, 2),
+                'engaged_time_min': round(engaged_time_min, 2),
+                'distance_km': round(data['distance_km'], 2),
+                'engaged_distance_km': round(data['engaged_distance_km'], 2),
+                'engagement_pct': round(engagement_pct, 2) if engagement_pct is not None else None,
+                'dist_engagement_pct': round(dist_engagement_pct, 2) if dist_engagement_pct is not None else None,
+                'time_ns': data['time_ns'],
+                'engaged_time_ns': data['engaged_time_ns'],
+                'distance_km_raw': data['distance_km'],
+                'engaged_distance_km_raw': data['engaged_distance_km'],
+            }
+
         return {
+            'speed_bucket_summary': speed_bucket_summary,
             'device_id': device_id,
             'drive_count': len(rows),
             'average_engagement_pct': round(avg_engagement, 2) if avg_engagement is not None else None,
@@ -545,7 +583,41 @@ class EngagementRepository:
             grand_total_steer_intervention_count / grand_total_steer_intervention_km * 100 if grand_total_steer_intervention_km > 0 else None
         )
 
+        grand_total_buckets = {
+            bucket['key']: {'time_ns': 0, 'engaged_time_ns': 0, 'distance_km': 0.0, 'engaged_distance_km': 0.0}
+            for bucket in SPEED_BUCKETS
+        }
+
+        for s in summaries:
+            summary_buckets = s.get('speed_bucket_summary') or {}
+            for key, data in summary_buckets.items():
+                if key in grand_total_buckets:
+                    grand_total_buckets[key]['time_ns'] += data.get('time_ns', 0)
+                    grand_total_buckets[key]['engaged_time_ns'] += data.get('engaged_time_ns', 0)
+                    grand_total_buckets[key]['distance_km'] += data.get('distance_km_raw', 0.0)
+                    grand_total_buckets[key]['engaged_distance_km'] += data.get('engaged_distance_km_raw', 0.0)
+
+        grand_total_bucket_summary = {}
+        for bucket_cfg in SPEED_BUCKETS:
+            key = bucket_cfg['key']
+            data = grand_total_buckets[key]
+            total_time_min = data['time_ns'] / 1e9 / 60
+            engaged_time_min = data['engaged_time_ns'] / 1e9 / 60
+            engagement_pct = (data['engaged_time_ns'] / data['time_ns'] * 100) if data['time_ns'] > 0 else None
+            dist_engagement_pct = (data['engaged_distance_km'] / data['distance_km'] * 100) if data['distance_km'] > 0 else None
+
+            grand_total_bucket_summary[key] = {
+                'label': bucket_cfg['label'],
+                'time_min': round(total_time_min, 2),
+                'engaged_time_min': round(engaged_time_min, 2),
+                'distance_km': round(data['distance_km'], 2),
+                'engaged_distance_km': round(data['engaged_distance_km'], 2),
+                'engagement_pct': round(engagement_pct, 2) if engagement_pct is not None else None,
+                'dist_engagement_pct': round(dist_engagement_pct, 2) if dist_engagement_pct is not None else None,
+            }
+
         return {
+            'speed_bucket_summary': grand_total_bucket_summary,
             'drive_count': drive_count,
             'total_distance_km': round(grand_total_distance_km, 2),
             'total_engaged_distance_km': round(grand_total_engaged_distance_km, 2),

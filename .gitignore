@@ -3,3 +3,4 @@ rlogs/*
 !rlogs/.gitkeep
 __pycache__/
 .venv/
+database_backups/*.bak

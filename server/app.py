@@ -89,3 +89,42 @@ def total_stats_view(request: Request) -> HTMLResponse:
         'last_loaded': repository.last_updated(),
     }
     return templates.TemplateResponse('total_stats.html', context)
+
+
+@app.get('/api/total_stats', summary='Grand total summary statistics')
+def api_total_stats_view() -> dict:
+    summary = repository.grand_total_summary()
+    return summary
+
+
+@app.get('/total_stats/style1', summary='Total stats - Style 1', response_class=HTMLResponse)
+def total_stats_style1_view(request: Request) -> HTMLResponse:
+    summary = repository.grand_total_summary()
+    context = {
+        'request': request,
+        'summary': summary,
+        'last_loaded': repository.last_updated(),
+    }
+    return templates.TemplateResponse('total_stats_style1.html', context)
+
+
+@app.get('/total_stats/style2', summary='Total stats - Style 2', response_class=HTMLResponse)
+def total_stats_style2_view(request: Request) -> HTMLResponse:
+    summary = repository.grand_total_summary()
+    context = {
+        'request': request,
+        'summary': summary,
+        'last_loaded': repository.last_updated(),
+    }
+    return templates.TemplateResponse('total_stats_style2.html', context)
+
+
+@app.get('/total_stats/style3', summary='Total stats - Style 3', response_class=HTMLResponse)
+def total_stats_style3_view(request: Request) -> HTMLResponse:
+    summary = repository.grand_total_summary()
+    context = {
+        'request': request,
+        'summary': summary,
+        'last_loaded': repository.last_updated(),
+    }
+    return templates.TemplateResponse('total_stats_style3.html', context)

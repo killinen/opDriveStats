@@ -8,7 +8,7 @@ Usage: sync_stats.sh [-f local_db] [-p remote_path] [-u user] [-s host]
 
 Options:
   -f  Path to the local engagement DB JSON (default: engagement_db.json)
-  -p  Remote absolute path for the DB file (default: /home/oracle/engagement_gauge_dev/engagement_db.json)
+  -p  Remote absolute path for the DB file (default: /home/ubuntu/opDriveStats/engagement_db.json)
   -u  Remote SSH user (default: oracle)
   -s  Remote SSH host (required unless SYNC_STATS_HOST env var set)
 
@@ -24,7 +24,7 @@ Example:
 USAGE
 }
 
-DEFAULT_REMOTE_PATH='~/engagement_gauge_dev/engagement_db.json'
+DEFAULT_REMOTE_PATH='~/opDriveStats/engagement_db.json'
 
 LOCAL_DB=${SYNC_STATS_DB:-engagement_db.json}
 REMOTE_PATH=${SYNC_STATS_PATH:-$DEFAULT_REMOTE_PATH}
@@ -71,11 +71,13 @@ REMOTE_TMP="${REMOTE_PATH}.new.$$"
 
 quote_remote_arg() {
     local value=$1
-    if [[ $value == ~/* ]]; then
-        local suffix=${value#~/}
-        suffix=${suffix//"/\\"}
+    if [[ $value == "~/"* ]]; then
+        local suffix=${value#"~/"}
+        local dq='"'
+        local esc='\"'
+        suffix=${suffix//$dq/$esc}
         printf '"$HOME/%s"' "$suffix"
-    elif [[ $value == ~ ]]; then
+    elif [[ $value == "~" ]]; then
         printf '"$HOME"'
     else
         printf '%q' "$value"
