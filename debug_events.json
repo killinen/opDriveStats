@@ -12682,5 +12682,47 @@
     "event_type": "steer_intervention",
     "time_in_segment_s": 35.534903685,
     "reason": "Steering intervention detected (diff: 1.51)"
+  },
+  {
+    "drive": "2025-10-19--11-56-53",
+    "rlog_path": "./rlogs/41c5cb6e/2025-10-19--11-56-53--2/rlog.bz2",
+    "event_type": "steer_intervention",
+    "time_in_segment_s": 44.644248524,
+    "reason": "Steering intervention detected (diff: 1.55)"
+  },
+  {
+    "drive": "2025-10-19--12-13-12",
+    "rlog_path": "./rlogs/41c5cb6e/2025-10-19--12-13-12--6/rlog.bz2",
+    "event_type": "steer_intervention",
+    "time_in_segment_s": 35.484479101,
+    "reason": "Steering intervention detected (diff: 1.50)"
+  },
+  {
+    "drive": "2025-10-25--14-12-29",
+    "rlog_path": "./rlogs/41c5cb6e/2025-10-25--14-12-29--3/rlog.bz2",
+    "event_type": "steer_intervention",
+    "time_in_segment_s": 59.644333779,
+    "reason": "Steering intervention detected (diff: 1.53)"
+  },
+  {
+    "drive": "2025-10-25--14-12-29",
+    "rlog_path": "./rlogs/41c5cb6e/2025-10-25--14-12-29--4/rlog.bz2",
+    "event_type": "steer_intervention",
+    "time_in_segment_s": 0.003838281,
+    "reason": "Steering intervention detected (diff: 4.04)"
+  },
+  {
+    "drive": "2025-10-25--18-06-02",
+    "rlog_path": "./rlogs/41c5cb6e/2025-10-25--18-06-02--8/rlog.bz2",
+    "event_type": "steer_intervention",
+    "time_in_segment_s": 7.794157185,
+    "reason": "Steering intervention detected (diff: 1.51)"
+  },
+  {
+    "drive": "2025-10-25--18-06-02",
+    "rlog_path": "./rlogs/41c5cb6e/2025-10-25--18-06-02--18/rlog.bz2",
+    "event_type": "steer_intervention",
+    "time_in_segment_s": 45.653189566,
+    "reason": "Steering intervention detected (diff: 1.50)"
   }
 ]

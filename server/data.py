@@ -139,8 +139,13 @@ class EngagementRepository:
         total_drive_time_hours = sum(_ns_to_hours(row.get('drive_time')) for row in rows)
         total_active_time_hours = sum(_ns_to_hours(row.get('drive_time_active')) for row in rows)
         total_time_hours = sum(_ns_to_hours(row.get('total_time')) for row in rows)
-        total_interventions = sum(int(row.get('intervention_count') or 0) for row in rows)
-        total_steer_interventions = sum(int(row.get('steer_intervention_count') or 0) for row in rows)
+        total_interventions = sum(float(row.get('intervention_count') or 0.0) for row in rows)
+        total_disengagements = sum(
+            float(row.get('disengagement_count'))
+            for row in rows
+            if row.get('disengagement_count') is not None
+        )
+        total_steer_interventions = sum(float(row.get('steer_intervention_count') or 0.0) for row in rows)
 
         overall_engagement_pct = (
             total_engaged_distance / total_distance * 100 if total_distance > 0 else None
@@ -150,6 +155,9 @@ class EngagementRepository:
         )
         total_interventions_per_100km = (
             total_interventions / total_distance * 100 if total_distance > 0 else None
+        )
+        total_disengagements_per_100km = (
+            total_disengagements / total_distance * 100 if total_distance > 0 else None
         )
 
         STEER_INTERVENTION_START_DATE = datetime(2025, 7, 7, tzinfo=timezone.utc)
@@ -169,18 +177,42 @@ class EngagementRepository:
         latest_drive = max(timestamps).isoformat() if timestamps else None
 
         bucket_aggregate = {
-            bucket['key']: {'time_ns': 0, 'engaged_time_ns': 0, 'distance_km': 0.0, 'engaged_distance_km': 0.0}
+            bucket['key']: {
+                'time_ns': 0,
+                'engaged_time_ns': 0,
+                'distance_km': 0.0,
+                'engaged_distance_km': 0.0,
+                'intervention_count': 0.0,
+                'steer_intervention_count': 0.0,
+                'disengagement_count': 0.0,
+                'steer_distance_km': 0.0,
+                'disengagement_distance_km': 0.0,
+            }
             for bucket in SPEED_BUCKETS
         }
 
         for row in rows:
+            drive_date = _parse_drive_timestamp(row.get('drive'))
             row_buckets = row.get('speed_buckets') or {}
             for key, data in row_buckets.items():
                 if key in bucket_aggregate:
-                    bucket_aggregate[key]['time_ns'] += data.get('time_ns', 0)
-                    bucket_aggregate[key]['engaged_time_ns'] += data.get('engaged_time_ns', 0)
-                    bucket_aggregate[key]['distance_km'] += data.get('distance_km_raw', 0.0)
-                    bucket_aggregate[key]['engaged_distance_km'] += data.get('engaged_distance_km_raw', 0.0)
+                    bucket_data = bucket_aggregate[key]
+                    bucket_data['time_ns'] += data.get('time_ns', 0)
+                    bucket_data['engaged_time_ns'] += data.get('engaged_time_ns', 0)
+                    bucket_data['distance_km'] += data.get('distance_km_raw', 0.0)
+                    bucket_data['engaged_distance_km'] += data.get('engaged_distance_km_raw', 0.0)
+                    bucket_data['intervention_count'] += float(data.get('intervention_count') or 0.0)
+
+                    steer_count = data.get('steer_intervention_count')
+                    if steer_count is not None:
+                        if drive_date is None or drive_date >= STEER_INTERVENTION_START_DATE:
+                            bucket_data['steer_intervention_count'] += float(steer_count or 0.0)
+                            bucket_data['steer_distance_km'] += data.get('distance_km_raw', 0.0)
+
+                    diseng_count = data.get('disengagement_count')
+                    if diseng_count is not None:
+                        bucket_data['disengagement_count'] += float(diseng_count or 0.0)
+                        bucket_data['disengagement_distance_km'] += data.get('distance_km_raw', 0.0)
         
         speed_bucket_summary = {}
         for bucket_cfg in SPEED_BUCKETS:
@@ -190,6 +222,15 @@ class EngagementRepository:
             engaged_time_min = data['engaged_time_ns'] / 1e9 / 60
             engagement_pct = (data['engaged_time_ns'] / data['time_ns'] * 100) if data['time_ns'] > 0 else None
             dist_engagement_pct = (data['engaged_distance_km'] / data['distance_km'] * 100) if data['distance_km'] > 0 else None
+            interventions_per_100km = (
+                data['intervention_count'] / data['distance_km'] * 100 if data['distance_km'] > 0 else None
+            )
+            steer_per_100km = (
+                data['steer_intervention_count'] / data['steer_distance_km'] * 100 if data['steer_distance_km'] > 0 else None
+            )
+            diseng_per_100km = (
+                data['disengagement_count'] / data['disengagement_distance_km'] * 100 if data['disengagement_distance_km'] > 0 else None
+            )
 
             speed_bucket_summary[key] = {
                 'label': bucket_cfg['label'],
@@ -203,6 +244,12 @@ class EngagementRepository:
                 'engaged_time_ns': data['engaged_time_ns'],
                 'distance_km_raw': data['distance_km'],
                 'engaged_distance_km_raw': data['engaged_distance_km'],
+                'intervention_count': data['intervention_count'],
+                'steer_intervention_count': data['steer_intervention_count'],
+                'disengagement_count': data['disengagement_count'],
+                'interventions_per_100km': round(interventions_per_100km, 2) if interventions_per_100km is not None else None,
+                'steer_interventions_per_100km': round(steer_per_100km, 2) if steer_per_100km is not None else None,
+                'disengagements_per_100km': round(diseng_per_100km, 2) if diseng_per_100km is not None else None,
             }
 
         return {
@@ -219,9 +266,11 @@ class EngagementRepository:
             'total_time_hours': round(total_time_hours, 2),
             'overall_engagement_pct': round(overall_engagement_pct, 2) if overall_engagement_pct is not None else None,
             'overall_time_engagement_pct': round(overall_time_engagement_pct, 2) if overall_time_engagement_pct is not None else None,
-            'total_intervention_count': total_interventions,
+            'total_intervention_count': int(round(total_interventions)),
             'total_interventions_per_100km': round(total_interventions_per_100km, 2) if total_interventions_per_100km is not None else None,
-            'total_steer_intervention_count': total_steer_interventions,
+            'total_disengagement_count': int(round(total_disengagements)),
+            'total_disengagements_per_100km': round(total_disengagements_per_100km, 2) if total_disengagements_per_100km is not None else None,
+            'total_steer_intervention_count': int(round(total_steer_interventions)),
             'total_steer_interventions_per_100km': round(total_steer_interventions_per_100km, 2) if total_steer_interventions_per_100km is not None else None,
             'first_drive': first_drive,
             'latest_drive': latest_drive,
@@ -566,6 +615,7 @@ class EngagementRepository:
         grand_total_active_time_hours = sum(s.get('total_active_time_hours', 0) for s in summaries)
         grand_total_time_hours = sum(s.get('total_time_hours', 0) for s in summaries)
         grand_total_intervention_count = sum(s.get('total_intervention_count', 0) for s in summaries)
+        grand_total_disengagement_count = sum(s.get('total_disengagement_count', 0) or 0 for s in summaries)
         grand_total_steer_intervention_count = sum(s.get('total_steer_intervention_count', 0) for s in summaries)
         grand_total_steer_intervention_km = sum(s.get('total_steer_intervention_km', 0) for s in summaries)
         drive_count = sum(s.get('drive_count', 0) for s in summaries)
@@ -579,12 +629,25 @@ class EngagementRepository:
         total_interventions_per_100km = (
             grand_total_intervention_count / grand_total_distance_km * 100 if grand_total_distance_km > 0 else None
         )
+        total_disengagements_per_100km = (
+            grand_total_disengagement_count / grand_total_distance_km * 100 if grand_total_distance_km > 0 else None
+        )
         total_steer_interventions_per_100km = (
             grand_total_steer_intervention_count / grand_total_steer_intervention_km * 100 if grand_total_steer_intervention_km > 0 else None
         )
 
         grand_total_buckets = {
-            bucket['key']: {'time_ns': 0, 'engaged_time_ns': 0, 'distance_km': 0.0, 'engaged_distance_km': 0.0}
+            bucket['key']: {
+                'time_ns': 0,
+                'engaged_time_ns': 0,
+                'distance_km': 0.0,
+                'engaged_distance_km': 0.0,
+                'intervention_count': 0.0,
+                'steer_intervention_count': 0.0,
+                'disengagement_count': 0.0,
+                'steer_distance_km': 0.0,
+                'disengagement_distance_km': 0.0,
+            }
             for bucket in SPEED_BUCKETS
         }
 
@@ -592,10 +655,16 @@ class EngagementRepository:
             summary_buckets = s.get('speed_bucket_summary') or {}
             for key, data in summary_buckets.items():
                 if key in grand_total_buckets:
-                    grand_total_buckets[key]['time_ns'] += data.get('time_ns', 0)
-                    grand_total_buckets[key]['engaged_time_ns'] += data.get('engaged_time_ns', 0)
-                    grand_total_buckets[key]['distance_km'] += data.get('distance_km_raw', 0.0)
-                    grand_total_buckets[key]['engaged_distance_km'] += data.get('engaged_distance_km_raw', 0.0)
+                    bucket_data = grand_total_buckets[key]
+                    bucket_data['time_ns'] += data.get('time_ns', 0)
+                    bucket_data['engaged_time_ns'] += data.get('engaged_time_ns', 0)
+                    bucket_data['distance_km'] += data.get('distance_km_raw', 0.0)
+                    bucket_data['engaged_distance_km'] += data.get('engaged_distance_km_raw', 0.0)
+                    bucket_data['intervention_count'] += data.get('intervention_count', 0.0) or 0.0
+                    bucket_data['steer_intervention_count'] += data.get('steer_intervention_count', 0.0) or 0.0
+                    bucket_data['disengagement_count'] += data.get('disengagement_count', 0.0) or 0.0
+                    bucket_data['steer_distance_km'] += data.get('distance_km_raw', 0.0) if data.get('steer_intervention_count') is not None else 0.0
+                    bucket_data['disengagement_distance_km'] += data.get('distance_km_raw', 0.0) if data.get('disengagement_count') is not None else 0.0
 
         grand_total_bucket_summary = {}
         for bucket_cfg in SPEED_BUCKETS:
@@ -605,6 +674,15 @@ class EngagementRepository:
             engaged_time_min = data['engaged_time_ns'] / 1e9 / 60
             engagement_pct = (data['engaged_time_ns'] / data['time_ns'] * 100) if data['time_ns'] > 0 else None
             dist_engagement_pct = (data['engaged_distance_km'] / data['distance_km'] * 100) if data['distance_km'] > 0 else None
+            interventions_per_100km = (
+                data['intervention_count'] / data['distance_km'] * 100 if data['distance_km'] > 0 else None
+            )
+            steer_per_100km = (
+                data['steer_intervention_count'] / data['steer_distance_km'] * 100 if data['steer_distance_km'] > 0 else None
+            )
+            diseng_per_100km = (
+                data['disengagement_count'] / data['disengagement_distance_km'] * 100 if data['disengagement_distance_km'] > 0 else None
+            )
 
             grand_total_bucket_summary[key] = {
                 'label': bucket_cfg['label'],
@@ -614,6 +692,12 @@ class EngagementRepository:
                 'engaged_distance_km': round(data['engaged_distance_km'], 2),
                 'engagement_pct': round(engagement_pct, 2) if engagement_pct is not None else None,
                 'dist_engagement_pct': round(dist_engagement_pct, 2) if dist_engagement_pct is not None else None,
+                'intervention_count': data['intervention_count'],
+                'steer_intervention_count': data['steer_intervention_count'],
+                'disengagement_count': data['disengagement_count'],
+                'interventions_per_100km': round(interventions_per_100km, 2) if interventions_per_100km is not None else None,
+                'steer_interventions_per_100km': round(steer_per_100km, 2) if steer_per_100km is not None else None,
+                'disengagements_per_100km': round(diseng_per_100km, 2) if diseng_per_100km is not None else None,
             }
 
         return {
@@ -628,6 +712,8 @@ class EngagementRepository:
             'overall_time_engagement_pct': round(overall_time_engagement_pct, 2) if overall_time_engagement_pct is not None else None,
             'total_intervention_count': grand_total_intervention_count,
             'total_interventions_per_100km': round(total_interventions_per_100km, 2) if total_interventions_per_100km is not None else None,
+            'total_disengagement_count': grand_total_disengagement_count,
+            'total_disengagements_per_100km': round(total_disengagements_per_100km, 2) if total_disengagements_per_100km is not None else None,
             'total_steer_intervention_count': grand_total_steer_intervention_count,
             'total_steer_interventions_per_100km': round(total_steer_interventions_per_100km, 2) if total_steer_interventions_per_100km is not None else None,
         }

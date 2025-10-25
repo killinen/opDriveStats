@@ -382,6 +382,9 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
             'engaged_time': 0,
             'distance': 0.0,
             'engaged_distance': 0.0,
+            'intervention_count': 0,
+            'steer_intervention_count': 0,
+            'disengagement_count': 0,
         } for bucket in SPEED_BUCKETS},
     }
     engaged_distance = 0
@@ -391,9 +394,12 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
     # Track engagement interventions
     engagement_state_changes = 0
     interventions = 0
+    disengagements = 0
     total_steer_interventions = 0
     last_engagement_state = None
     pending_reengagement = False
+    engagement_events: List[Dict[str, Any]] = []
+    disengagement_events: List[Dict[str, Any]] = []
     
     for rlog_file in rlog_files_sorted:
         # Enable logic for post-2025-07-06 only
@@ -454,16 +460,26 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
                         engagement_stable = False
                         print(f"    Engagement change at {current_time}, starting buffer period")
                         
-                        if current_state == False:  # ON → OFF (disengagement)
+                        bucket_key = _speed_bucket_for(prev_speed)
+                        bucket = drive_stats['speed_buckets'][bucket_key]
+                        event_info = {"bucket": bucket_key, "timestamp_ns": current_time}
+
+                        if current_state is False:  # ON → OFF (disengagement)
                             print(f"    Disengagement #{engagement_state_changes}: ON → OFF")
                             pending_reengagement = True
-                        elif current_state == True and pending_reengagement:  # OFF → ON (re-engagement)
+                            bucket['disengagement_count'] += 1
+                            disengagements += 1
+                            disengagement_events.append(event_info)
+                        elif current_state is True and pending_reengagement:  # OFF → ON (re-engagement)
                             print(f"    Re-engagement #{engagement_state_changes}: OFF → ON")
                             interventions += 1  # Complete intervention cycle
                             pending_reengagement = False
+                            bucket['intervention_count'] += 1
+                            engagement_events.append(event_info)
                             print(f"    ✅ Intervention #{interventions} completed (OFF → ON → OFF cycle)")
                         else:  # First engagement of the drive
                             print(f"    Initial engagement #{engagement_state_changes}: OFF → ON")
+                            engagement_events.append(event_info)
                     
                     last_engagement_state = current_state
                     
@@ -543,6 +559,9 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
                                     (now - last_steer_intervention_time > INTERVENTION_TIMEOUT_NS)
                                 ):
                                     steer_intervention_count += 1
+                                    bucket_key = _speed_bucket_for(prev_speed)
+                                    bucket = drive_stats['speed_buckets'][bucket_key]
+                                    bucket['steer_intervention_count'] += 1
                                     in_intervention = True
                                     last_steer_intervention_time = now
                                     segment_time_s = (now - start_time) / 1e9
@@ -614,6 +633,34 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
             continue
 
     # Calculate final drive statistics
+    raw_disengagements = disengagements
+    manual_shutdown_removed: List[Dict[str, Any]] = []
+    if disengagement_events:
+        last_event = disengagement_events[-1]
+        bucket_key = last_event["bucket"]
+        bucket = drive_stats["speed_buckets"][bucket_key]
+        if bucket["disengagement_count"] > 0:
+            bucket["disengagement_count"] -= 1
+            disengagements = max(disengagements - 1, 0)
+            manual_shutdown_removed.append(
+                {"bucket": bucket_key, "timestamp_ns": int(last_event["timestamp_ns"])}
+            )
+            print(f"🛑 Manual shutdown detected in bucket '{bucket_key}', excluding from disengagement counts.")
+        else:
+            print(f"⚠️ Manual shutdown detected in '{bucket_key}' but bucket count already zero; skipping adjustment.")
+
+    initial_engage_bucket = engagement_events[0]["bucket"] if engagement_events else None
+    manual_shutdown_bucket = manual_shutdown_removed[0]["bucket"] if manual_shutdown_removed else None
+    drive_stats["initial_engagement_bucket"] = initial_engage_bucket
+    drive_stats["manual_shutdown_bucket"] = manual_shutdown_bucket
+    drive_stats["disengagement_corrections"] = {
+        "version": 2,
+        "manual_shutdown_removed": len(manual_shutdown_removed),
+        "removed_events": manual_shutdown_removed,
+        "raw_count": int(raw_disengagements),
+        "adjusted_count": int(disengagements),
+    }
+
     drive_stats['odo_distance'] = round((drive_stats['odo_end'] - drive_stats['odo_start']), 1) if drive_stats['odo_start'] is not None and drive_stats['odo_end'] is not None else None
     drive_stats['engaged_distance'] = round(engaged_distance, 1) if drive_stats['odo_start'] is not None else None
 
@@ -634,14 +681,18 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
         drive_stats['cruise_press_seconds_per_hour'] = 0.0
 
     # Calculate engagement percentages and intervention rates
+    drive_stats['disengagement_count'] = disengagements
+
     if drive_stats['odo_distance'] and drive_stats['odo_distance'] > 0:
         drive_stats['engagement_pct_odo'] = round((engaged_distance / drive_stats['odo_distance']) * 100, 2)
         drive_stats['steer_interventions_per_100km'] = round((total_steer_interventions / drive_stats['odo_distance']) * 100, 2)
         drive_stats['interventions_per_100km'] = round((interventions / drive_stats['odo_distance']) * 100, 2)
+        drive_stats['disengagements_per_100km'] = round((disengagements / drive_stats['odo_distance']) * 100, 2)
     else:
         drive_stats['engagement_pct_odo'] = None
         drive_stats['steer_interventions_per_100km'] = None
         drive_stats['interventions_per_100km'] = None
+        drive_stats['disengagements_per_100km'] = None
 
     # Store intervention counts
     drive_stats['total_state_changes'] = engagement_state_changes
@@ -655,6 +706,12 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
         total_distance_km = data['distance']
         engaged_distance_km = data['engaged_distance']
         engagement_pct = (data['engaged_time'] / data['time'] * 100) if data['time'] > 0 else None
+        bucket_interventions = data['intervention_count']
+        bucket_steer_interventions = data['steer_intervention_count']
+        bucket_disengagements = data['disengagement_count']
+        inter_per_100km = (bucket_interventions / total_distance_km * 100) if total_distance_km > 0 else None
+        steer_per_100km = (bucket_steer_interventions / total_distance_km * 100) if total_distance_km > 0 else None
+        disengagements_per_100km = (bucket_disengagements / total_distance_km * 100) if total_distance_km > 0 else None
         bucket_summary[key] = {
             'label': bucket_cfg['label'],
             'time_min': round(total_time_min, 2),
@@ -666,6 +723,12 @@ def process_drive_offline(drive_name, rlog_files, device_id, debug_mode=None, de
             'engaged_time_ns': data['engaged_time'],
             'distance_km_raw': total_distance_km,
             'engaged_distance_km_raw': engaged_distance_km,
+            'intervention_count': bucket_interventions,
+            'steer_intervention_count': bucket_steer_interventions,
+            'disengagement_count': bucket_disengagements,
+            'interventions_per_100km': round(inter_per_100km, 2) if inter_per_100km is not None else None,
+            'steer_interventions_per_100km': round(steer_per_100km, 2) if steer_per_100km is not None else None,
+            'disengagements_per_100km': round(disengagements_per_100km, 2) if disengagements_per_100km is not None else None,
         }
     drive_stats['speed_buckets'] = bucket_summary
     drive_stats['steer_intervention_count'] = total_steer_interventions
@@ -969,6 +1032,11 @@ def main():
                     "intervention_count": drive_stats.get('intervention_count'),
                     "steer_intervention_count": drive_stats.get('steer_intervention_count'),
                     "steer_interventions_per_100km": drive_stats.get('steer_interventions_per_100km'),
+                    "disengagement_count": drive_stats.get('disengagement_count'),
+                    "disengagements_per_100km": drive_stats.get('disengagements_per_100km'),
+                    "initial_engagement_bucket": drive_stats.get('initial_engagement_bucket'),
+                    "manual_shutdown_bucket": drive_stats.get('manual_shutdown_bucket'),
+                    "disengagement_corrections": drive_stats.get('disengagement_corrections'),
                     "openpilot_longitudinal": drive_stats.get('openpilot_longitudinal'),
                     "car_fingerprint": drive_stats.get('car_fingerprint'),
                     "device_type": drive_stats.get('device_type'),
@@ -1303,6 +1371,11 @@ def main():
                         "intervention_count": drive_stats.get('intervention_count'),
                         "steer_intervention_count": drive_stats.get('steer_intervention_count'),
                         "steer_interventions_per_100km": drive_stats.get('steer_interventions_per_100km'),
+                        "disengagement_count": drive_stats.get('disengagement_count'),
+                        "disengagements_per_100km": drive_stats.get('disengagements_per_100km'),
+                        "initial_engagement_bucket": drive_stats.get('initial_engagement_bucket'),
+                        "manual_shutdown_bucket": drive_stats.get('manual_shutdown_bucket'),
+                        "disengagement_corrections": drive_stats.get('disengagement_corrections'),
                         "openpilot_longitudinal": drive_stats.get('openpilot_longitudinal'),
                         "car_fingerprint": drive_stats.get('car_fingerprint'),
                         "device_type": drive_stats.get('device_type'),
@@ -1425,7 +1498,18 @@ def main():
         total_engaged_distance = 0
         total_cruise_press_time_ns = 0
         total_steer_intervention_km = 0
-        bucket_aggregate = {bucket['key']: {'time': 0, 'engaged_time': 0, 'distance': 0.0, 'engaged_distance': 0.0} for bucket in SPEED_BUCKETS}
+        bucket_aggregate = {
+            bucket['key']: {
+                'time': 0,
+                'engaged_time': 0,
+                'distance': 0.0,
+                'engaged_distance': 0.0,
+                'intervention_count': 0,
+                'steer_intervention_count': 0,
+                'disengagement_count': 0,
+            }
+            for bucket in SPEED_BUCKETS
+        }
 
         sorted_drives = sorted(
             drives.items(),
@@ -1487,6 +1571,9 @@ def main():
                     bucket_aggregate[key]['engaged_time'] += data.get('engaged_time_ns', 0)
                     bucket_aggregate[key]['distance'] += data.get('distance_km_raw', 0.0)
                     bucket_aggregate[key]['engaged_distance'] += data.get('engaged_distance_km_raw', 0.0)
+                    bucket_aggregate[key]['intervention_count'] += data.get('intervention_count', 0) or 0
+                    bucket_aggregate[key]['steer_intervention_count'] += data.get('steer_intervention_count', 0) or 0
+                    bucket_aggregate[key]['disengagement_count'] += data.get('disengagement_count', 0) or 0
 
                 opl = stats.get('openpilot_longitudinal')
                 if opl is True:

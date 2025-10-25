@@ -235,8 +235,8 @@
                     <div class="metric">
                         <div class="metric-label">Disengagements /100km</div>
                         <div class="metric-value">
-                            {% if summary.total_interventions_per_100km is not none %}
-                                {{ summary.total_interventions_per_100km | round(2) }}
+                            {% if summary.total_disengagements_per_100km is not none %}
+                                {{ summary.total_disengagements_per_100km | round(2) }}
                             {% else %}
                                 —
                             {% endif %}
@@ -254,7 +254,7 @@
                     </div>
                     <div class="metric">
                         <div class="metric-label">Total Disengagements</div>
-                        <div class="metric-value">{{ summary.total_intervention_count }}</div>
+                        <div class="metric-value">{{ summary.total_disengagement_count }}</div>
                     </div>
                     <div class="metric">
                         <div class="metric-label">Total Steering Interventions</div>
@@ -277,6 +277,8 @@
                             <th>Distance Engagement</th>
                             <th>Total Time</th>
                             <th>Total Distance</th>
+                            <th>Dis /100km</th>
+                            <th>Steer /100km</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -299,6 +301,20 @@
                             </td>
                             <td>{{ bucket.engaged_time_min | round(1) }} / {{ bucket.time_min | round(1) }} min</td>
                             <td>{{ bucket.engaged_distance_km | round(1) }} / {{ bucket.distance_km | round(1) }} km</td>
+                            <td>
+                                {% if bucket.disengagements_per_100km is not none %}
+                                    {{ bucket.disengagements_per_100km | round(2) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if bucket.steer_interventions_per_100km is not none %}
+                                    {{ bucket.steer_interventions_per_100km | round(2) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

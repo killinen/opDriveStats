@@ -333,8 +333,8 @@
                         <div class="metric">
                             <div class="metric-label">Disengagements /100km</div>
                             <div class="metric-value">
-                                {% if summary.total_interventions_per_100km is not none %}
-                                    {{ summary.total_interventions_per_100km | round(2) }}
+                                {% if summary.total_disengagements_per_100km is not none %}
+                                    {{ summary.total_disengagements_per_100km | round(2) }}
                                 {% else %}
                                     —
                                 {% endif %}
@@ -352,13 +352,51 @@
                         </div>
                         <div class="metric">
                             <div class="metric-label">Total Disengagements</div>
-                            <div class="metric-value">{{ summary.total_intervention_count }}</div>
+                            <div class="metric-value">{{ summary.total_disengagement_count }}</div>
                         </div>
                         <div class="metric">
                             <div class="metric-label">Total Engaged Distance</div>
                             <div class="metric-value">{{ summary.total_engaged_distance_km | round(1) }} km</div>
                         </div>
                     </div>
+
+                    {% if summary.speed_bucket_summary %}
+                        <section style="margin-top: 18px;">
+                            <h3 style="margin: 0 0 12px 0; font-size: 1rem; color: var(--text-muted); letter-spacing: 0.04em;">Speed Buckets</h3>
+                            <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                                {% for key, bucket in summary.speed_bucket_summary.items() %}
+                                    <div class="metric" style="padding: 14px;">
+                                        <div class="metric-label" style="margin-bottom: 6px;">{{ bucket.label }}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">
+                                            {{ bucket.engaged_distance_km | round(1) }} / {{ bucket.distance_km | round(1) }} km
+                                        </div>
+                                        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+                                            <div>
+                                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.08em;">Dis/100km</div>
+                                                <div class="metric-value" style="font-size: 1rem;">
+                                                    {% if bucket.disengagements_per_100km is not none %}
+                                                        {{ bucket.disengagements_per_100km | round(2) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.08em;">Steer/100km</div>
+                                                <div class="metric-value" style="font-size: 1rem;">
+                                                    {% if bucket.steer_interventions_per_100km is not none %}
+                                                        {{ bucket.steer_interventions_per_100km | round(2) }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% endif %}
 
                     {% if device.drives %}
                         <details class="drive-table">
