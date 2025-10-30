@@ -133,6 +133,8 @@
                             <th>Dist Engaged</th>
                             <th>Total Time</th>
                             <th>Total Dist</th>
+                            <th>% of Total Time</th>
+                            <th>% of Total Dist</th>
                             <th>Dis /100km</th>
                             <th>Steer /100km</th>
                         </tr>
@@ -145,6 +147,8 @@
                             <td>{{ bucket.dist_engagement_pct | round(1) }}%</td>
                             <td>{{ bucket.time_min | round(1) }} min</td>
                             <td>{{ bucket.distance_km | round(1) }} km</td>
+                            <td>{{ bucket.time_pct_of_total | round(1) }}%</td>
+                            <td>{{ bucket.distance_pct_of_total | round(1) }}%</td>
                             <td>
                                 {% if bucket.disengagements_per_100km is not none %}
                                     {{ bucket.disengagements_per_100km | round(2) }}
