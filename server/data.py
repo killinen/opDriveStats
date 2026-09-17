@@ -67,6 +67,12 @@ def _format_pct(value: Optional[float], decimals: int = 1) -> str:
     return f"{value:.{decimals}f}%"
 
 
+def _round_optional(value: Optional[float], decimals: int = 2) -> Optional[float]:
+    if value is None:
+        return None
+    return round(value, decimals)
+
+
 class EngagementRepository:
     """Load engagement statistics from a JSON file with basic caching."""
 
@@ -129,6 +135,318 @@ class EngagementRepository:
             return None
         return self._build_device_summary(device_id, rows)
 
+    def comparison_options(self) -> Dict[str, Any]:
+        entries = self.all_entries()
+        devices = sorted({entry.get('device_id') or 'unknown' for entry in entries})
+        branches = sorted({
+            entry.get('git_branch') or 'unknown'
+            for entry in entries
+        })
+        return {
+            'devices': devices,
+            'branches': branches,
+            'speed_buckets': [
+                {'key': 'all', 'label': 'All speeds'},
+                *[
+                    {'key': bucket['key'], 'label': bucket['label']}
+                    for bucket in SPEED_BUCKETS
+                ],
+            ],
+        }
+
+    def comparison_summary(
+        self,
+        device_ids: Optional[List[str]] = None,
+        branch: Optional[Any] = 'all',
+        speed_bucket: str = 'all',
+    ) -> Dict[str, Any]:
+        options = self.comparison_options()
+        valid_buckets = {'all'} | {bucket['key'] for bucket in SPEED_BUCKETS}
+        selected_bucket = speed_bucket if speed_bucket in valid_buckets else 'all'
+        selected_devices = [
+            device_id
+            for device_id in (device_ids or [])
+            if device_id and device_id in options['devices']
+        ]
+        if not selected_devices:
+            selected_devices = options['devices']
+
+        entries = self.all_entries()
+        if selected_devices:
+            entries = [
+                entry
+                for entry in entries
+                if (entry.get('device_id') or 'unknown') in selected_devices
+            ]
+
+        if isinstance(branch, list):
+            requested_branches = [item for item in branch if item]
+        elif branch:
+            requested_branches = [branch]
+        else:
+            requested_branches = ['all']
+
+        if not requested_branches or 'all' in requested_branches:
+            selected_branches = ['all']
+        else:
+            selected_branches = [
+                item
+                for item in requested_branches
+                if item in options['branches']
+            ]
+            if not selected_branches:
+                selected_branches = ['all']
+
+        if selected_branches != ['all']:
+            entries = [
+                entry
+                for entry in entries
+                if (entry.get('git_branch') or 'unknown') in selected_branches
+            ]
+
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
+        for entry in entries:
+            grouped.setdefault(entry.get('device_id') or 'unknown', []).append(entry)
+
+        rows = []
+        for device_id in selected_devices:
+            device_rows = grouped.get(device_id, [])
+            if selected_bucket == 'all':
+                rows.append(self._build_comparison_all_row(device_id, device_rows))
+            else:
+                rows.append(self._build_comparison_bucket_row(device_id, device_rows, selected_bucket))
+
+        rows = [row for row in rows if row is not None]
+        totals = self._build_comparison_total_row(rows)
+        bucket_label = 'All speeds'
+        for bucket in options['speed_buckets']:
+            if bucket['key'] == selected_bucket:
+                bucket_label = bucket['label']
+                break
+
+        return {
+            'options': options,
+            'selected_devices': selected_devices,
+            'selected_branches': selected_branches,
+            'selected_branch': 'all' if selected_branches == ['all'] else ', '.join(selected_branches),
+            'selected_speed_bucket': selected_bucket,
+            'selected_speed_bucket_label': bucket_label,
+            'rows': rows,
+            'totals': totals,
+            'last_loaded': self.last_updated(),
+        }
+
+    def _branch_distribution(self, rows: List[Dict[str, Any]]) -> str:
+        counts: Dict[str, int] = {}
+        for row in rows:
+            branch = row.get('git_branch') or 'unknown'
+            counts[branch] = counts.get(branch, 0) + 1
+        if not counts:
+            return '—'
+        ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        if len(ordered) == 1:
+            return ordered[0][0]
+        return ', '.join(f'{branch} ({count})' for branch, count in ordered[:3])
+
+    def _first_latest_drive_values(self, rows: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:
+        if not rows:
+            return {'first_drive': None, 'latest_drive': None}
+
+        parsed = [
+            (_parse_drive_timestamp(row.get('drive')), row.get('drive'))
+            for row in rows
+            if row.get('drive')
+        ]
+        parsed_timestamps = [(ts, drive) for ts, drive in parsed if ts is not None]
+        if parsed_timestamps:
+            return {
+                'first_drive': min(parsed_timestamps, key=lambda item: item[0])[1],
+                'latest_drive': max(parsed_timestamps, key=lambda item: item[0])[1],
+            }
+
+        drive_names = sorted(row.get('drive') for row in rows if row.get('drive'))
+        return {
+            'first_drive': drive_names[0] if drive_names else None,
+            'latest_drive': drive_names[-1] if drive_names else None,
+        }
+
+    def _speed_mix(
+        self,
+        bucket_distances: Dict[str, float],
+    ) -> Dict[str, Optional[float]]:
+        """Return each speed bucket's share of distance with speed data."""
+        classified_distance_km = _safe_sum([
+            bucket_distances.get(bucket['key'])
+            for bucket in SPEED_BUCKETS
+        ])
+        return {
+            bucket['key']: _round_optional(
+                float(bucket_distances.get(bucket['key']) or 0.0) / classified_distance_km * 100
+                if classified_distance_km > 0 else None
+            )
+            for bucket in SPEED_BUCKETS
+        }
+
+    def _build_comparison_all_row(self, device_id: str, rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not rows:
+            return None
+
+        summary = self._build_device_summary(device_id, rows)
+        drive_values = self._first_latest_drive_values(rows)
+        speed_bucket_distance_km = {
+            bucket['key']: summary['speed_bucket_summary'][bucket['key']]['distance_km_raw']
+            for bucket in SPEED_BUCKETS
+        }
+        return {
+            'device_id': device_id,
+            'branch': self._branch_distribution(rows),
+            'drive_count': summary['drive_count'],
+            'distance_km': summary['total_distance_km'],
+            'engaged_distance_km': summary['total_engaged_distance_km'],
+            'time_hours': summary['total_time_hours'],
+            'engaged_time_hours': summary['total_active_time_hours'],
+            'time_engagement_pct': summary['overall_time_engagement_pct'],
+            'distance_engagement_pct': summary['overall_engagement_pct'],
+            'disengagement_count': summary['total_disengagement_count'],
+            'disengagements_per_100km': summary['total_disengagements_per_100km'],
+            'disengagement_distance_km': summary['total_distance_km'],
+            'steer_intervention_count': summary['total_steer_intervention_count'],
+            'steer_interventions_per_100km': summary['total_steer_interventions_per_100km'],
+            'steer_distance_km': summary['total_steer_intervention_km'],
+            'speed_bucket_distance_km': speed_bucket_distance_km,
+            'speed_mix_pct': self._speed_mix(speed_bucket_distance_km),
+            'first_drive': drive_values['first_drive'],
+            'latest_drive': drive_values['latest_drive'],
+        }
+
+    def _build_comparison_bucket_row(
+        self,
+        device_id: str,
+        rows: List[Dict[str, Any]],
+        bucket_key: str,
+    ) -> Optional[Dict[str, Any]]:
+        if not rows:
+            return None
+
+        STEER_INTERVENTION_START_DATE = datetime(2025, 7, 7, tzinfo=timezone.utc)
+        time_ns = 0
+        engaged_time_ns = 0
+        distance_km = 0.0
+        engaged_distance_km = 0.0
+        disengagement_count = 0.0
+        disengagement_distance_km = 0.0
+        steer_intervention_count = 0.0
+        steer_distance_km = 0.0
+        rows_with_bucket_data = []
+
+        for row in rows:
+            bucket = (row.get('speed_buckets') or {}).get(bucket_key)
+            if not bucket:
+                continue
+
+            bucket_time_ns = bucket.get('time_ns') or 0
+            bucket_distance_km = float(bucket.get('distance_km_raw') or 0.0)
+            if bucket_time_ns <= 0 and bucket_distance_km <= 0:
+                continue
+
+            rows_with_bucket_data.append(row)
+            time_ns += bucket_time_ns
+            engaged_time_ns += bucket.get('engaged_time_ns') or 0
+            distance_km += bucket_distance_km
+            engaged_distance_km += float(bucket.get('engaged_distance_km_raw') or 0.0)
+
+            bucket_disengagement_count = bucket.get('disengagement_count')
+            if bucket_disengagement_count is not None:
+                disengagement_count += float(bucket_disengagement_count or 0.0)
+                disengagement_distance_km += bucket_distance_km
+
+            bucket_steer_count = bucket.get('steer_intervention_count')
+            drive_date = _parse_drive_timestamp(row.get('drive'))
+            if bucket_steer_count is not None and (drive_date is None or drive_date >= STEER_INTERVENTION_START_DATE):
+                steer_intervention_count += float(bucket_steer_count or 0.0)
+                steer_distance_km += bucket_distance_km
+
+        if not rows_with_bucket_data:
+            return None
+
+        time_hours = time_ns / 1e9 / 3600
+        engaged_time_hours = engaged_time_ns / 1e9 / 3600
+        time_engagement_pct = engaged_time_ns / time_ns * 100 if time_ns > 0 else None
+        distance_engagement_pct = engaged_distance_km / distance_km * 100 if distance_km > 0 else None
+        disengagements_per_100km = (
+            disengagement_count / disengagement_distance_km * 100
+            if disengagement_distance_km > 0 else None
+        )
+        steer_interventions_per_100km = (
+            steer_intervention_count / steer_distance_km * 100
+            if steer_distance_km > 0 else None
+        )
+        drive_values = self._first_latest_drive_values(rows_with_bucket_data)
+
+        return {
+            'device_id': device_id,
+            'branch': self._branch_distribution(rows_with_bucket_data),
+            'drive_count': len(rows_with_bucket_data),
+            'distance_km': round(distance_km, 2),
+            'engaged_distance_km': round(engaged_distance_km, 2),
+            'time_hours': round(time_hours, 2),
+            'engaged_time_hours': round(engaged_time_hours, 2),
+            'time_engagement_pct': _round_optional(time_engagement_pct),
+            'distance_engagement_pct': _round_optional(distance_engagement_pct),
+            'disengagement_count': int(round(disengagement_count)),
+            'disengagements_per_100km': _round_optional(disengagements_per_100km),
+            'disengagement_distance_km': round(disengagement_distance_km, 2),
+            'steer_intervention_count': int(round(steer_intervention_count)),
+            'steer_interventions_per_100km': _round_optional(steer_interventions_per_100km),
+            'steer_distance_km': round(steer_distance_km, 2),
+            'first_drive': drive_values['first_drive'],
+            'latest_drive': drive_values['latest_drive'],
+        }
+
+    def _build_comparison_total_row(self, rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not rows:
+            return None
+
+        distance_km = _safe_sum([row.get('distance_km') for row in rows])
+        engaged_distance_km = _safe_sum([row.get('engaged_distance_km') for row in rows])
+        time_hours = _safe_sum([row.get('time_hours') for row in rows])
+        engaged_time_hours = _safe_sum([row.get('engaged_time_hours') for row in rows])
+        disengagement_count = sum(float(row.get('disengagement_count') or 0.0) for row in rows)
+        disengagement_distance_km = _safe_sum([row.get('disengagement_distance_km') for row in rows])
+        steer_intervention_count = sum(float(row.get('steer_intervention_count') or 0.0) for row in rows)
+        steer_distance_km = _safe_sum([row.get('steer_distance_km') for row in rows])
+        speed_bucket_distance_km = None
+        if any(row.get('speed_bucket_distance_km') is not None for row in rows):
+            speed_bucket_distance_km = {
+                bucket['key']: _safe_sum([
+                    (row.get('speed_bucket_distance_km') or {}).get(bucket['key'])
+                    for row in rows
+                ])
+                for bucket in SPEED_BUCKETS
+            }
+
+        return {
+            'device_id': 'Total',
+            'branch': '—',
+            'drive_count': sum(int(row.get('drive_count') or 0) for row in rows),
+            'distance_km': round(distance_km, 2),
+            'engaged_distance_km': round(engaged_distance_km, 2),
+            'time_hours': round(time_hours, 2),
+            'engaged_time_hours': round(engaged_time_hours, 2),
+            'time_engagement_pct': _round_optional(engaged_time_hours / time_hours * 100 if time_hours > 0 else None),
+            'distance_engagement_pct': _round_optional(engaged_distance_km / distance_km * 100 if distance_km > 0 else None),
+            'disengagement_count': int(round(disengagement_count)),
+            'disengagements_per_100km': _round_optional(disengagement_count / disengagement_distance_km * 100 if disengagement_distance_km > 0 else None),
+            'disengagement_distance_km': round(disengagement_distance_km, 2),
+            'steer_intervention_count': int(round(steer_intervention_count)),
+            'steer_interventions_per_100km': _round_optional(steer_intervention_count / steer_distance_km * 100 if steer_distance_km > 0 else None),
+            'steer_distance_km': round(steer_distance_km, 2),
+            'speed_bucket_distance_km': speed_bucket_distance_km,
+            'speed_mix_pct': self._speed_mix(speed_bucket_distance_km) if speed_bucket_distance_km is not None else None,
+            'first_drive': None,
+            'latest_drive': None,
+        }
+
     def _build_device_summary(self, device_id: str, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         avg_engagement = _safe_mean([row.get('engagement_pct') for row in rows])
         avg_engagement_odo = _safe_mean([row.get('engagement_pct_odo') for row in rows])
@@ -164,7 +482,9 @@ class EngagementRepository:
         total_steer_intervention_km = 0.0
         for row in rows:
             drive_date = _parse_drive_timestamp(row.get('drive'))
-            if drive_date and drive_date >= STEER_INTERVENTION_START_DATE:
+            # Newer route-style drive IDs do not contain a timestamp. Their
+            # steering metrics are already populated, so include their distance.
+            if drive_date is None or drive_date >= STEER_INTERVENTION_START_DATE:
                 total_steer_intervention_km += row.get('odo_distance') or 0.0
 
         total_steer_interventions_per_100km = (
@@ -435,7 +755,7 @@ class EngagementRepository:
 
                 STEER_INTERVENTION_START_DATE = datetime(2025, 7, 7, tzinfo=timezone.utc)
                 drive_date = _parse_drive_timestamp(drive.get('drive'))
-                if drive_date and drive_date >= STEER_INTERVENTION_START_DATE:
+                if drive_date is None or drive_date >= STEER_INTERVENTION_START_DATE:
                     total_steer_intervention_km += distance_km
 
                 duration_minutes = total_time_ns / 1e9 / 60

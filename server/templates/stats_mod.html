@@ -64,6 +64,15 @@
             gap: 12px;
         }
 
+        .last-loaded a {
+            color: #7dd3fc;
+            text-decoration: none;
+        }
+
+        .last-loaded a:hover {
+            text-decoration: underline;
+        }
+
         .device-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -273,11 +282,14 @@
         <header class="page-header">
             <h1>Engagement Dashboard</h1>
             <div class="last-loaded">
-                {% if last_loaded %}
-                    Last refreshed: {{ last_loaded | replace('T', ' ') }}
-                {% else %}
-                    Waiting for first data sync…
-                {% endif %}
+                <span>
+                    {% if last_loaded %}
+                        Last refreshed: {{ last_loaded | replace('T', ' ') }}
+                    {% else %}
+                        Waiting for first data sync…
+                    {% endif %}
+                </span>
+                <span><a href="/compare">Compare devices</a></span>
             </div>
         </header>
 

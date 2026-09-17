@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Total Stats [Retro Split]</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Crect%20x%3D%276%27%20y%3D%2726%27%20width%3D%2752%27%20height%3D%2718%27%20rx%3D%278%27%20fill%3D%27%2338bdf8%27%2F%3E%3Cpath%20d%3D%27M18%2026l6-10h16l6%2010%27%20fill%3D%27%237dd3fc%27%2F%3E%3Ccircle%20cx%3D%2720%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230b1020%27%2F%3E%3Ccircle%20cx%3D%2744%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230b1020%27%2F%3E%3Ccircle%20cx%3D%2720%27%20cy%3D%2744%27%20r%3D%273%27%20fill%3D%27%23dbeafe%27%2F%3E%3Ccircle%20cx%3D%2744%27%20cy%3D%2744%27%20r%3D%273%27%20fill%3D%27%23dbeafe%27%2F%3E%3C%2Fsvg%3E">
+    <style>
+        :root {
+            --bg: #000;
+            --fg: #0f0;
+            --muted: #6aff6a;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            padding: 1.5em;
+            margin: 0;
+        }
+        .page {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 8px var(--fg);
+            margin: 0 0 0.5em 0;
+        }
+        .last-loaded {
+            text-align: right;
+            font-size: 0.85em;
+            margin-bottom: 1.5em;
+        }
+        .columns {
+            display: flex;
+            gap: 1.5em;
+            align-items: stretch;
+            flex-wrap: wrap;
+        }
+        .panel {
+            border: 2px solid var(--fg);
+            padding: 1.25em;
+            flex: 1 1 320px;
+            min-width: 0;
+        }
+        .panel h2 {
+            font-size: 1.15em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin: 0 0 0.75em 0;
+        }
+        .explanation {
+            border: 1px dashed var(--fg);
+            padding: 0.75em;
+            margin-bottom: 0.85em;
+        }
+        .explanation-title {
+            font-size: 0.9em;
+            color: var(--muted);
+            margin-bottom: 0.3em;
+            text-transform: uppercase;
+        }
+        .metrics, .buckets {
+            border-top: 1px dashed var(--fg);
+            margin-top: 1em;
+            padding-top: 1em;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1em;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed rgba(0, 255, 0, 0.3);
+            padding-bottom: 0.5em;
+        }
+        .metric + .metric {
+            margin-top: 0.75em;
+        }
+        .metric-label {
+            padding-right: 1em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        th, td {
+            border: 1px dashed var(--fg);
+            padding: 0.5em;
+            text-align: left;
+        }
+        .table-scroll {
+            width: 100%;
+            overflow-x: auto;
+        }
+        .table-scroll table {
+            min-width: 720px;
+        }
+        .speed-note {
+            font-size: 0.85em;
+            color: var(--muted);
+            margin-bottom: 0.75em;
+        }
+        @media (max-width: 900px) {
+            .columns {
+                flex-direction: column;
+            }
+            .panel {
+                min-width: 100%;
+            }
+            .metric-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 1em;
+                font-size: 15px;
+            }
+            h1 {
+                letter-spacing: 2px;
+                font-size: 2rem;
+            }
+            .panel {
+                padding: 1em;
+            }
+            .metric {
+                flex-direction: column;
+                gap: 0.2em;
+            }
+            .last-loaded {
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <h1>Engagement Command Deck</h1>
+        <div class="last-loaded">
+            {% if last_loaded %}
+                > Last Sync: {{ last_loaded | replace('T', ' ') }}
+            {% endif %}
+        </div>
+
+        {% if not summary %}
+            <p>> NO DATA AVAILABLE...</p>
+        {% else %}
+            <div class="columns">
+                <section class="panel info-panel">
+                    <h2>[ Stat Guide ]</h2>
+                    <div class="explanation">
+                        <div class="explanation-title">Total Drives</div>
+                        <p>Count of uploaded drives that made it into this build. Each entry is one trip with valid logs.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Total Distance</div>
+                        <p>All kilometers recorded, engaged or not. Acts as the odometer baseline for everything else.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Total Engaged Distance</div>
+                        <p>Kilometers where assisted driving was active. Comparing this to total distance yields ODO engagement.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Total Active Hours</div>
+                        <p>Minutes spent with the system available or engaged, converted to hours for easier scanning.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">ODO Engagement</div>
+                        <p>Engaged kilometers divided by overall kilometers. Higher means the system is trusted for more of the route.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Time Engagement</div>
+                        <p>Engaged time divided by total active time. Complements the distance view when traffic slows things down.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Total Disengagements</div>
+                        <p>Every time the driver took over or the system exited by itself. Watch the per-100 km metric for normalization.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Disengagements / 100km</div>
+                        <p>Reliability indicator. Keeps comparisons fair even if the fleet size or distance changes.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Total Steer Interventions</div>
+                        <p>Counts steering nudges or overrides outside of full disengagements. Early signal for comfort issues.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Steer Interventions / 100km</div>
+                        <p>Same normalization as disengagements so spikes stand out regardless of trip length.</p>
+                    </div>
+                    <div class="explanation">
+                        <div class="explanation-title">Speed Buckets</div>
+                        <p>Breaks the totals into velocity bands. Engagement percentages inside each bucket show what happens in traffic vs highway.</p>
+                    </div>
+                </section>
+
+                <section class="panel stats-panel">
+                    <div class="metrics">
+                        <h2>[ Overall Stats ]</h2>
+                        <div class="metric-grid">
+                            <div class="metric">
+                                <span class="metric-label">Total Drives</span>
+                                <span class="metric-value">{{ summary.drive_count }}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Total Distance</span>
+                                <span class="metric-value">{{ summary.total_distance_km | round(1) }} km</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Total Engaged Distance</span>
+                                <span class="metric-value">{{ summary.total_engaged_distance_km | round(1) }} km</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Total Active Hours</span>
+                                <span class="metric-value">{{ summary.total_active_time_hours | round(1) }} h</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">ODO Engagement</span>
+                                <span class="metric-value">{{ summary.overall_engagement_pct | round(1) }}%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Time Engagement</span>
+                                <span class="metric-value">{{ summary.overall_time_engagement_pct | round(1) }}%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Total Disengagements</span>
+                                <span class="metric-value">{{ summary.total_disengagement_count }}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Disengagements / 100km</span>
+                                <span class="metric-value">{{ summary.total_disengagements_per_100km | round(2) }}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Total Steer Interventions</span>
+                                <span class="metric-value">{{ summary.total_steer_intervention_count }}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Steer Interventions / 100km</span>
+                                <span class="metric-value">{{ summary.total_steer_interventions_per_100km | round(2) }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if summary.speed_bucket_summary %}
+                    <div class="buckets">
+                        <h2>[ Speed Buckets ]</h2>
+                        <p class="speed-note">Percentages are relative to each bucket, values show actual time and distance logged.</p>
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Bucket</th>
+                                        <th>Time Engaged</th>
+                                        <th>Dist Engaged</th>
+                                        <th>Total Time</th>
+                                        <th>Total Dist</th>
+                                        <th>% of Total Time</th>
+                                        <th>% of Total Dist</th>
+                                        <th>Dis /100km</th>
+                                        <th>Steer /100km</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for key, bucket in summary.speed_bucket_summary.items() %}
+                                    <tr>
+                                        <td>{{ bucket.label }}</td>
+                                        <td>{{ bucket.engagement_pct | round(1) }}%</td>
+                                        <td>{{ bucket.dist_engagement_pct | round(1) }}%</td>
+                                        <td>{{ bucket.time_min | round(1) }} min</td>
+                                        <td>{{ bucket.distance_km | round(1) }} km</td>
+                                        <td>{{ bucket.time_pct_of_total | round(1) }}%</td>
+                                        <td>{{ bucket.distance_pct_of_total | round(1) }}%</td>
+                                        <td>
+                                            {% if bucket.disengagements_per_100km is not none %}
+                                                {{ bucket.disengagements_per_100km | round(2) }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if bucket.steer_interventions_per_100km is not none %}
+                                                {{ bucket.steer_interventions_per_100km | round(2) }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </section>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

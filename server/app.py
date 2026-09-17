@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -80,6 +81,37 @@ def stats_mod_view(request: Request) -> HTMLResponse:
     return templates.TemplateResponse('stats_mod.html', context)
 
 
+@app.get('/compare', summary='Compare engagement stats by device, branch, and speed bucket', response_class=HTMLResponse)
+def compare_view(
+    request: Request,
+    device: Optional[List[str]] = Query(None),
+    branch: Optional[List[str]] = Query(None),
+    speed_bucket: str = 'all',
+) -> HTMLResponse:
+    comparison = repository.comparison_summary(
+        device_ids=device,
+        branch=branch,
+        speed_bucket=speed_bucket,
+    )
+    context = {
+        'request': request,
+        'comparison': comparison,
+        'last_loaded': repository.last_updated(),
+    }
+    return templates.TemplateResponse('compare.html', context)
+
+
+@app.get('/api/compare', summary='Comparison stats by device, branch, and speed bucket')
+def api_compare_view(
+    device: Optional[List[str]] = Query(None),
+    branch: Optional[List[str]] = Query(None),
+    speed_bucket: str = 'all',
+) -> dict:
+    return repository.comparison_summary(
+        device_ids=device,
+        branch=branch,
+        speed_bucket=speed_bucket,
+    )
 @app.get('/total_stats', summary='Modern engagement dashboard with totals', response_class=HTMLResponse)
 def total_stats_view(request: Request) -> HTMLResponse:
     summary = repository.grand_total_summary()
@@ -128,3 +160,12 @@ def total_stats_style3_view(request: Request) -> HTMLResponse:
         'last_loaded': repository.last_updated(),
     }
     return templates.TemplateResponse('total_stats_style3.html', context)
+@app.get('/total_stats/style4', summary='Total stats - Style 4', response_class=HTMLResponse)
+def total_stats_style4_view(request: Request) -> HTMLResponse:
+    summary = repository.grand_total_summary()
+    context = {
+        'request': request,
+        'summary': summary,
+        'last_loaded': repository.last_updated(),
+    }
+    return templates.TemplateResponse('total_stats_style4.html', context)
