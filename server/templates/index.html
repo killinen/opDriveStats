@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Engagement Gauge</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --background: #0b1020;
+            --card: rgba(19, 26, 48, 0.92);
+            --border: rgba(120, 148, 255, 0.28);
+            --text: #f5f7ff;
+            --muted: #a8b2d6;
+            --accent: #7dd3fc;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 32px 20px;
+            font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at top left, rgba(127, 140, 255, 0.2), transparent 45%), var(--background);
+        }
+
+        main { max-width: 1000px; margin: 0 auto; }
+
+        h1 { margin: 0 0 8px; font-size: clamp(2rem, 5vw, 3rem); }
+        h2 { margin: 32px 0 12px; font-size: 1.2rem; color: var(--muted); }
+        p { margin: 0; color: var(--muted); }
+
+        .updated { margin-top: 12px; font-size: 0.9rem; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        a.card {
+            display: block;
+            min-height: 112px;
+            padding: 18px;
+            color: inherit;
+            text-decoration: none;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            transition: border-color .15s ease, transform .15s ease;
+        }
+
+        a.card:hover, a.card:focus-visible {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .name { display: block; margin-bottom: 8px; color: var(--accent); font-weight: 700; }
+        .description { font-size: 0.92rem; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Engagement Gauge</h1>
+        <p>Choose a dashboard or data endpoint.</p>
+        <p class="updated">
+            {% if last_loaded %}Last refreshed: {{ last_loaded | replace('T', ' ') }}{% else %}Waiting for first data sync…{% endif %}
+        </p>
+
+        <h2>Dashboards</h2>
+        <section class="grid">
+            <a class="card" href="/stats_mod"><span class="name">Device dashboard</span><span class="description">Per-device engagement and drive details.</span></a>
+            <a class="card" href="/compare"><span class="name">Compare devices</span><span class="description">Compare devices, branches, and speed buckets.</span></a>
+            <a class="card" href="/total_stats"><span class="name">Fleet totals</span><span class="description">Combined engagement statistics across all devices.</span></a>
+            <a class="card" href="/stats"><span class="name">CLI summary</span><span class="description">Plain-text engagement summary.</span></a>
+        </section>
+
+        <h2>Fleet-total styles</h2>
+        <section class="grid">
+            <a class="card" href="/total_stats/style1"><span class="name">Style 1</span><span class="description">Retro fleet-total view.</span></a>
+            <a class="card" href="/total_stats/style2"><span class="name">Style 2</span><span class="description">Alternative fleet-total view.</span></a>
+            <a class="card" href="/total_stats/style3"><span class="name">Style 3</span><span class="description">Alternative fleet-total view.</span></a>
+            <a class="card" href="/total_stats/style4"><span class="name">Style 4</span><span class="description">Alternative fleet-total view.</span></a>
+        </section>
+
+        <h2>Data and documentation</h2>
+        <section class="grid">
+            <a class="card" href="/health"><span class="name">Health</span><span class="description">Service status and data refresh time.</span></a>
+            <a class="card" href="/devices"><span class="name">Devices API</span><span class="description">Device summaries in JSON.</span></a>
+            <a class="card" href="/api/compare"><span class="name">Comparison API</span><span class="description">Comparison data in JSON.</span></a>
+            <a class="card" href="/api/total_stats"><span class="name">Total stats API</span><span class="description">Fleet totals in JSON.</span></a>
+            <a class="card" href="/docs"><span class="name">API documentation</span><span class="description">Interactive OpenAPI documentation.</span></a>
+        </section>
+    </main>
+</body>
+</html>

@@ -25,6 +25,14 @@ app.add_middleware(
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / 'templates'))
 
 
+@app.get('/', summary='Engagement Gauge home', response_class=HTMLResponse)
+def home_view(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        'index.html',
+        {'request': request, 'last_loaded': repository.last_updated()},
+    )
+
+
 @app.get('/health', summary='Health check')
 def health() -> dict:
     return {'status': 'ok', 'last_loaded': repository.last_updated()}
