@@ -140,6 +140,12 @@
             font-size: 1.25rem;
             font-weight: 600;
         }
+
+        .metric-note {
+            margin-top: 6px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
         .speed-buckets-container {
             margin-top: 32px;
             background: var(--bg-card);
@@ -256,6 +262,15 @@
                         <div class="metric-label">Total Disengagements</div>
                         <div class="metric-value">{{ summary.total_disengagement_count }}</div>
                     </div>
+                    <div class="metric" title="No single blinker from 8 seconds before to 3 seconds after each disengagement; only drives with blinker detection are included">
+                        <div class="metric-label">Non-intersection Disengagements</div>
+                        <div class="metric-value">{{ summary.non_intersection_disengagement_count if summary.non_intersection_disengagement_count is not none else '—' }}</div>
+                    </div>
+                    <div class="metric" title="Based on {{ summary.non_intersection_covered_drives }} drives and {{ summary.non_intersection_distance_km | round(1) }} km with blinker detection">
+                        <div class="metric-label">Non-intersection /100km</div>
+                        <div class="metric-value">{% if summary.non_intersection_disengagements_per_100km is not none %}{{ summary.non_intersection_disengagements_per_100km | round(2) }}{% else %}—{% endif %}</div>
+                        <div class="metric-note">{{ summary.non_intersection_covered_drives }} drives · {{ summary.non_intersection_distance_km | round(1) }} km covered</div>
+                    </div>
                     <div class="metric">
                         <div class="metric-label">Total Steering Interventions</div>
                         <div class="metric-value">{{ summary.total_steer_intervention_count }}</div>
@@ -278,6 +293,7 @@
                             <th>Total Time</th>
                             <th>Total Distance</th>
                             <th>Dis /100km</th>
+                            <th>Non-int. /100km</th>
                             <th>Steer /100km</th>
                         </tr>
                     </thead>
@@ -304,6 +320,13 @@
                             <td>
                                 {% if bucket.disengagements_per_100km is not none %}
                                     {{ bucket.disengagements_per_100km | round(2) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td title="{{ bucket.non_intersection_covered_drives }} drives · {{ bucket.non_intersection_distance_km | round(1) }} km with detection">
+                                {% if bucket.non_intersection_disengagements_per_100km is not none %}
+                                    {{ bucket.non_intersection_disengagements_per_100km | round(2) }}
                                 {% else %}
                                     —
                                 {% endif %}

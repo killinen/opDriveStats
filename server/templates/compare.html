@@ -1563,7 +1563,7 @@
                             <span class="table-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 10h16M10 5v14" stroke="currentColor" stroke-width="1.7"/></svg></span>
                             <div>
                                 <h2 id="details-title">Detailed comparison</h2>
-                                <p class="panel-subtitle">Every metric, side by side</p>
+                                <p class="panel-subtitle">Non-intersection rates use only drives with blinker detection; hover a rate for its coverage.</p>
                             </div>
                         </div>
                         <span class="table-note">Select a heading to sort · Scroll horizontally for more</span>
@@ -1586,6 +1586,8 @@
                                     <th><button class="sort-button" type="button" data-sort="number">Hours</button></th>
                                     <th><button class="sort-button" type="button" data-sort="number">Diseng.</button></th>
                                     <th><button class="sort-button" type="button" data-sort="number">Dis. / 100 km</button></th>
+                                    <th><button class="sort-button" type="button" data-sort="number"><abbr title="Disengagements without a single blinker from 8 seconds before to 3 seconds after; available on schema v4 drives">Non-intersection</abbr></button></th>
+                                    <th><button class="sort-button" type="button" data-sort="number"><abbr title="Per 100 km on drives with blinker-based detection only">Non-int. / 100 km</abbr></button></th>
                                     <th><button class="sort-button" type="button" data-sort="number">Steer</button></th>
                                     <th><button class="sort-button" type="button" data-sort="number">Steer / 100 km</button></th>
                                     <th><button class="sort-button" type="button" data-sort="number">Drives</button></th>
@@ -1610,6 +1612,8 @@
                                         <td data-value="{{ row.time_hours }}">{{ row.time_hours | round(1) }}</td>
                                         <td data-value="{{ row.disengagement_count }}">{{ row.disengagement_count }}</td>
                                         <td data-value="{{ row.disengagements_per_100km if row.disengagements_per_100km is not none else -1 }}"><span class="value-pill attention">{% if row.disengagements_per_100km is not none %}{{ row.disengagements_per_100km | round(2) }}{% else %}—{% endif %}</span></td>
+                                        <td data-value="{{ row.non_intersection_disengagement_count if row.non_intersection_disengagement_count is not none else -1 }}">{{ row.non_intersection_disengagement_count if row.non_intersection_disengagement_count is not none else '—' }}</td>
+                                        <td data-value="{{ row.non_intersection_disengagements_per_100km if row.non_intersection_disengagements_per_100km is not none else -1 }}" title="{{ row.non_intersection_covered_drives }} drives · {{ row.non_intersection_distance_km | round(1) }} km with detection">{% if row.non_intersection_disengagements_per_100km is not none %}{{ row.non_intersection_disengagements_per_100km | round(2) }}{% else %}—{% endif %}</td>
                                         <td data-value="{{ row.steer_intervention_count }}">{{ row.steer_intervention_count }}</td>
                                         <td data-value="{{ row.steer_interventions_per_100km if row.steer_interventions_per_100km is not none else -1 }}"><span class="value-pill steer">{% if row.steer_interventions_per_100km is not none %}{{ row.steer_interventions_per_100km | round(2) }}{% else %}—{% endif %}</span></td>
                                         <td data-value="{{ row.drive_count }}">{{ row.drive_count }}</td>
@@ -1634,6 +1638,8 @@
                                     <td>{{ comparison.totals.time_hours | round(1) }}</td>
                                     <td>{{ comparison.totals.disengagement_count }}</td>
                                     <td>{% if comparison.totals.disengagements_per_100km is not none %}{{ comparison.totals.disengagements_per_100km | round(2) }}{% else %}—{% endif %}</td>
+                                    <td>{{ comparison.totals.non_intersection_disengagement_count if comparison.totals.non_intersection_disengagement_count is not none else '—' }}</td>
+                                    <td title="{{ comparison.totals.non_intersection_covered_drives }} drives · {{ comparison.totals.non_intersection_distance_km | round(1) }} km with detection">{% if comparison.totals.non_intersection_disengagements_per_100km is not none %}{{ comparison.totals.non_intersection_disengagements_per_100km | round(2) }}{% else %}—{% endif %}</td>
                                     <td>{{ comparison.totals.steer_intervention_count }}</td>
                                     <td>{% if comparison.totals.steer_interventions_per_100km is not none %}{{ comparison.totals.steer_interventions_per_100km | round(2) }}{% else %}—{% endif %}</td>
                                     <td>{{ comparison.totals.drive_count }}</td>

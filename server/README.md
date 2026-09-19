@@ -51,6 +51,11 @@ Set `DRIVE_STATS_SOURCE_URL` and provide the scoped source token to enable the
 background puller. It runs immediately at startup and polls every 60 seconds.
 Fetched records are upserted by `(device_id, drive)`, the JSON database is
 replaced atomically, and the cursor advances only after the data is durable.
+Schema v4 records also include blinker-derived non-intersection disengagements.
+The device, comparison, and total summaries show their counts and rates. Rates
+use only drives carrying the new metric; older drives remain in other totals.
+Detection means no single blinker was observed from eight seconds before to
+three seconds after a disengagement, with the final manual shutdown excluded.
 
 ```bash
 export DRIVE_STATS_SOURCE_URL='https://goranconnect.duckdns.org/api/drive-stats/export'

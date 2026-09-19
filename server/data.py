@@ -73,6 +73,34 @@ def _round_optional(value: Optional[float], decimals: int = 2) -> Optional[float
     return round(value, decimals)
 
 
+def _non_intersection_summary(
+    rows: List[Dict[str, Any]], bucket_key: Optional[str] = None
+) -> Dict[str, Any]:
+    """Aggregate only drives carrying the blinker-based metric (schema v4)."""
+    source_rows = [
+        ((row.get('speed_buckets') or {}).get(bucket_key) or {}) if bucket_key else row
+        for row in rows
+    ]
+    covered = [source for source in source_rows if source.get('non_intersection_disengagement_count') is not None]
+    count = sum(int(source['non_intersection_disengagement_count']) for source in covered)
+    raw_count = sum(int(source.get('raw_non_intersection_disengagement_count') or 0) for source in covered)
+    blinker_count = sum(int(source.get('blinker_related_disengagement_count') or 0) for source in covered)
+    distance_key = 'distance_km_raw' if bucket_key else 'odo_distance'
+    time_key = 'drive_time_ns' if bucket_key else 'drive_time'
+    distance_km = _safe_sum([source.get(distance_key) for source in covered])
+    drive_hours = sum(_ns_to_hours(source.get(time_key)) for source in covered)
+    return {
+        'non_intersection_disengagement_count': count if covered else None,
+        'raw_non_intersection_disengagement_count': raw_count if covered else None,
+        'blinker_related_disengagement_count': blinker_count if covered else None,
+        'non_intersection_distance_km': round(distance_km, 2),
+        'non_intersection_drive_hours': round(drive_hours, 2),
+        'non_intersection_covered_drives': len(covered),
+        'non_intersection_disengagements_per_100km': _round_optional(count / distance_km * 100 if distance_km > 0 else None),
+        'non_intersection_disengagements_per_drive_hour': _round_optional(count / drive_hours if drive_hours > 0 else None),
+    }
+
+
 class EngagementRepository:
     """Load engagement statistics from a JSON file with basic caching."""
 
@@ -317,6 +345,7 @@ class EngagementRepository:
             'speed_mix_pct': self._speed_mix(speed_bucket_distance_km),
             'first_drive': drive_values['first_drive'],
             'latest_drive': drive_values['latest_drive'],
+            **_non_intersection_summary(rows),
         }
 
     def _build_comparison_bucket_row(
@@ -401,6 +430,7 @@ class EngagementRepository:
             'steer_distance_km': round(steer_distance_km, 2),
             'first_drive': drive_values['first_drive'],
             'latest_drive': drive_values['latest_drive'],
+            **_non_intersection_summary(rows_with_bucket_data, bucket_key),
         }
 
     def _build_comparison_total_row(self, rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -415,6 +445,12 @@ class EngagementRepository:
         disengagement_distance_km = _safe_sum([row.get('disengagement_distance_km') for row in rows])
         steer_intervention_count = sum(float(row.get('steer_intervention_count') or 0.0) for row in rows)
         steer_distance_km = _safe_sum([row.get('steer_distance_km') for row in rows])
+        non_intersection_rows = [row for row in rows if row.get('non_intersection_disengagement_count') is not None]
+        non_intersection_count = sum(int(row['non_intersection_disengagement_count']) for row in non_intersection_rows)
+        raw_non_intersection_count = sum(int(row.get('raw_non_intersection_disengagement_count') or 0) for row in non_intersection_rows)
+        blinker_related_count = sum(int(row.get('blinker_related_disengagement_count') or 0) for row in non_intersection_rows)
+        non_intersection_distance_km = _safe_sum([row.get('non_intersection_distance_km') for row in non_intersection_rows])
+        non_intersection_drive_hours = _safe_sum([row.get('non_intersection_drive_hours') for row in non_intersection_rows])
         speed_bucket_distance_km = None
         if any(row.get('speed_bucket_distance_km') is not None for row in rows):
             speed_bucket_distance_km = {
@@ -438,6 +474,14 @@ class EngagementRepository:
             'disengagement_count': int(round(disengagement_count)),
             'disengagements_per_100km': _round_optional(disengagement_count / disengagement_distance_km * 100 if disengagement_distance_km > 0 else None),
             'disengagement_distance_km': round(disengagement_distance_km, 2),
+            'non_intersection_disengagement_count': non_intersection_count if non_intersection_rows else None,
+            'raw_non_intersection_disengagement_count': raw_non_intersection_count if non_intersection_rows else None,
+            'blinker_related_disengagement_count': blinker_related_count if non_intersection_rows else None,
+            'non_intersection_distance_km': round(non_intersection_distance_km, 2),
+            'non_intersection_drive_hours': round(non_intersection_drive_hours, 2),
+            'non_intersection_covered_drives': sum(row.get('non_intersection_covered_drives', 0) for row in non_intersection_rows),
+            'non_intersection_disengagements_per_100km': _round_optional(non_intersection_count / non_intersection_distance_km * 100 if non_intersection_distance_km > 0 else None),
+            'non_intersection_disengagements_per_drive_hour': _round_optional(non_intersection_count / non_intersection_drive_hours if non_intersection_drive_hours > 0 else None),
             'steer_intervention_count': int(round(steer_intervention_count)),
             'steer_interventions_per_100km': _round_optional(steer_intervention_count / steer_distance_km * 100 if steer_distance_km > 0 else None),
             'steer_distance_km': round(steer_distance_km, 2),
@@ -570,10 +614,12 @@ class EngagementRepository:
                 'interventions_per_100km': round(interventions_per_100km, 2) if interventions_per_100km is not None else None,
                 'steer_interventions_per_100km': round(steer_per_100km, 2) if steer_per_100km is not None else None,
                 'disengagements_per_100km': round(diseng_per_100km, 2) if diseng_per_100km is not None else None,
+                **_non_intersection_summary(rows, key),
             }
 
         return {
             'speed_bucket_summary': speed_bucket_summary,
+            **_non_intersection_summary(rows),
             'device_id': device_id,
             'drive_count': len(rows),
             'average_engagement_pct': round(avg_engagement, 2) if avg_engagement is not None else None,
@@ -614,6 +660,12 @@ class EngagementRepository:
                 'interventions_per_100km': row.get('interventions_per_100km'),
                 'steer_intervention_count': row.get('steer_intervention_count'),
                 'steer_interventions_per_100km': row.get('steer_interventions_per_100km'),
+                'non_intersection_disengagement_count': row.get('non_intersection_disengagement_count'),
+                'raw_non_intersection_disengagement_count': row.get('raw_non_intersection_disengagement_count'),
+                'blinker_related_disengagement_count': row.get('blinker_related_disengagement_count'),
+                'non_intersection_disengagements_per_100km': row.get('non_intersection_disengagements_per_100km'),
+                'non_intersection_disengagements_per_drive_hour': row.get('non_intersection_disengagements_per_drive_hour'),
+                'non_intersection_detection': row.get('non_intersection_detection'),
                 'cruise_press_seconds': row.get('cruise_press_seconds'),
                 'cruise_press_seconds_per_hour': row.get('cruise_press_seconds_per_hour'),
                 'openpilot_longitudinal': row.get('openpilot_longitudinal'),
@@ -1025,10 +1077,12 @@ class EngagementRepository:
                 'disengagements_per_100km': round(diseng_per_100km, 2) if diseng_per_100km is not None else None,
                 'distance_pct_of_total': round(distance_pct_of_total, 2) if distance_pct_of_total is not None else None,
                 'time_pct_of_total': round(time_pct_of_total, 2) if time_pct_of_total is not None else None,
+                **_non_intersection_summary(self.all_entries(), key),
             }
 
         return {
             'speed_bucket_summary': grand_total_bucket_summary,
+            **_non_intersection_summary(self.all_entries()),
             'drive_count': drive_count,
             'total_distance_km': round(grand_total_distance_km, 2),
             'total_engaged_distance_km': round(grand_total_engaged_distance_km, 2),

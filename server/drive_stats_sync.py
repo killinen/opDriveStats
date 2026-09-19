@@ -56,7 +56,7 @@ def _read_json(path: Path, default: Any) -> Any:
 
 
 def _normalize_stats(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Add opDriveStats legacy aliases while retaining the complete v3 payload."""
+    """Add opDriveStats legacy aliases while retaining the complete source payload."""
     stats = deepcopy(payload)
     if not stats.get('device_id') or not stats.get('drive'):
         raise DriveStatsSyncError('Source item is missing device_id or drive')

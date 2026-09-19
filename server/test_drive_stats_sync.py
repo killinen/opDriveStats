@@ -108,6 +108,27 @@ class DriveStatsSynchronizerTests(unittest.TestCase):
             self.assertEqual(self.synchronizer.sync_once(), 0)
         fetch.assert_called_once_with(7)
 
+    def test_v4_blinker_metrics_survive_sync(self) -> None:
+        item = _source_item(1, '2026-09-19--10-00-00')
+        stats = item['stats']
+        stats['schema_version'] = 4
+        stats['non_intersection_disengagement_count'] = 1
+        stats['raw_non_intersection_disengagement_count'] = 2
+        stats['blinker_related_disengagement_count'] = 1
+        stats['non_intersection_detection'] = {
+            'version': 1, 'method': 'single_blinker_window',
+            'lookback_seconds': 8, 'lookahead_seconds': 3,
+        }
+        stats['speed_buckets']['city']['non_intersection_disengagement_count'] = 0
+
+        with patch.object(self.synchronizer, '_fetch_page', return_value={'items': [item], 'has_more': False}):
+            self.synchronizer.sync_once()
+
+        imported = json.loads(self.config.db_path.read_text(encoding='utf-8'))[0]
+        self.assertEqual(imported['schema_version'], 4)
+        self.assertEqual(imported['non_intersection_detection'], stats['non_intersection_detection'])
+        self.assertEqual(imported['speed_buckets']['city']['non_intersection_disengagement_count'], 0)
+
 
 if __name__ == '__main__':
     unittest.main()
