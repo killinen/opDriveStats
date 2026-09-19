@@ -245,6 +245,35 @@ class EngagementRepository:
                 rows.append(self._build_comparison_bucket_row(device_id, device_rows, selected_bucket))
 
         rows = [row for row in rows if row is not None]
+        speed_bucket_rows = []
+        speed_bucket_groups = []
+        for bucket in SPEED_BUCKETS:
+            bucket_rows = []
+            for device_id in selected_devices:
+                device_rows = grouped.get(device_id, [])
+                bucket_row = self._build_comparison_bucket_row(
+                    device_id,
+                    device_rows,
+                    bucket['key'],
+                )
+                if bucket_row is not None:
+                    bucket_row['speed_bucket'] = bucket['key']
+                    bucket_row['speed_bucket_label'] = bucket['label']
+                    bucket_rows.append(bucket_row)
+            if bucket_rows:
+                bucket_rows.sort(key=lambda row: (
+                    row['distance_engagement_pct'] is None,
+                    -(row['distance_engagement_pct'] or 0),
+                    row['device_id'],
+                ))
+                speed_bucket_groups.append({
+                    'key': bucket['key'],
+                    'label': bucket['label'],
+                    'distance_km': round(sum(row['distance_km'] for row in bucket_rows), 1),
+                    'rows': bucket_rows,
+                })
+                speed_bucket_rows.extend(bucket_rows)
+
         totals = self._build_comparison_total_row(rows)
         bucket_label = 'All speeds'
         for bucket in options['speed_buckets']:
@@ -260,6 +289,8 @@ class EngagementRepository:
             'selected_speed_bucket': selected_bucket,
             'selected_speed_bucket_label': bucket_label,
             'rows': rows,
+            'speed_bucket_rows': speed_bucket_rows,
+            'speed_bucket_groups': speed_bucket_groups,
             'totals': totals,
             'last_loaded': self.last_updated(),
         }

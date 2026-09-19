@@ -731,6 +731,45 @@
             white-space: nowrap;
         }
 
+        .panel-tools {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .snapshot-mode {
+            display: inline-grid;
+            grid-auto-flow: column;
+            gap: 3px;
+            padding: 3px;
+            background: #0b0f17;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+        }
+
+        .snapshot-mode button {
+            min-height: 30px;
+            padding: 0 10px;
+            color: var(--muted);
+            background: transparent;
+            border: 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.69rem;
+            font-weight: 680;
+            white-space: nowrap;
+        }
+
+        .snapshot-mode button[aria-pressed="true"] {
+            color: #eeeaff;
+            background: #2a2444;
+            box-shadow: inset 0 0 0 1px rgba(155, 135, 245, 0.24);
+        }
+
+        .snapshot-mode button[aria-disabled="true"] {
+            opacity: 0.42;
+        }
+
         .legend-item {
             display: inline-flex;
             align-items: center;
@@ -746,6 +785,93 @@
 
         .snapshot {
             padding: 4px 21px 18px;
+        }
+
+        .snapshot[hidden] {
+            display: none;
+        }
+
+        .speed-snapshot {
+            display: grid;
+            gap: 14px;
+            padding: 16px 20px 22px;
+        }
+
+        .speed-group {
+            --bucket-accent: var(--violet);
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: linear-gradient(110deg, rgba(155, 135, 245, 0.035), transparent 44%), var(--panel-soft);
+        }
+
+        .speed-group[data-bucket="road"] { --bucket-accent: var(--cyan); }
+        .speed-group[data-bucket="highway"] { --bucket-accent: var(--orange); }
+
+        .speed-group-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 70px;
+            padding: 13px 18px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(90deg, color-mix(in srgb, var(--bucket-accent) 9%, transparent), transparent 64%);
+        }
+
+        .speed-group-mark {
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            min-width: 52px;
+            height: 37px;
+            padding: 0 7px;
+            color: var(--bucket-accent);
+            border: 1px solid color-mix(in srgb, var(--bucket-accent) 32%, transparent);
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--bucket-accent) 10%, transparent);
+            font-size: 0.7rem;
+            font-weight: 800;
+        }
+
+        .speed-group-title {
+            margin: 0;
+            color: var(--text);
+            font-size: 0.91rem;
+            font-weight: 740;
+        }
+
+        .speed-group-meta {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 0.68rem;
+        }
+
+        .speed-group-count {
+            margin-left: auto;
+            padding: 6px 9px;
+            color: var(--muted-bright);
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            font-size: 0.67rem;
+            white-space: nowrap;
+        }
+
+        .speed-group-body {
+            padding: 0 18px 5px;
+        }
+
+        .speed-group .snapshot-row:first-of-type {
+            border-top-color: transparent;
+        }
+
+        .speed-group .rank {
+            color: var(--bucket-accent);
+            border-color: color-mix(in srgb, var(--bucket-accent) 30%, var(--line));
+        }
+
+        .speed-group .driver-avatar {
+            font-size: 0.72rem;
+            letter-spacing: 0;
         }
 
         .snapshot-header,
@@ -1180,6 +1306,48 @@
             .snapshot-row {
                 min-width: 830px;
             }
+
+            .snapshot.speed-snapshot {
+                overflow: visible;
+            }
+
+            .speed-group .snapshot-header {
+                display: none;
+            }
+
+            .speed-group .snapshot-row {
+                min-width: 0;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 14px;
+                padding: 16px 0;
+            }
+
+            .speed-group .driver-cell {
+                grid-column: 1 / -1;
+            }
+
+            .speed-group .bar-metric::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 8px;
+                color: var(--muted);
+                font-size: 0.62rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+            }
+
+            .speed-group .bar-values {
+                display: block;
+            }
+
+            .speed-group .bar-context {
+                display: block;
+                overflow: hidden;
+                margin-top: 4px;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
         }
 
         @media (max-width: 650px) {
@@ -1277,6 +1445,7 @@
 
             .panel-head {
                 align-items: flex-start;
+                flex-wrap: wrap;
                 padding: 16px;
             }
 
@@ -1285,8 +1454,42 @@
                 display: none;
             }
 
+            .panel-tools {
+                margin-left: auto;
+            }
+
             .snapshot {
                 padding: 4px 16px 15px;
+            }
+
+            .speed-snapshot {
+                padding: 12px;
+            }
+
+            .speed-group-head {
+                padding: 12px;
+            }
+
+            .speed-group-body {
+                padding: 4px 10px 10px;
+            }
+
+            .speed-group .snapshot-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 14px 12px;
+                margin-top: 8px;
+                padding: 14px;
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                background: var(--panel-raised);
+            }
+
+            .speed-group .bar-metric[data-rate] {
+                grid-column: 1 / -1;
+            }
+
+            .speed-group-count {
+                display: none;
             }
         }
 
@@ -1505,16 +1708,22 @@
                             <span class="table-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 18V9m7 9V5m7 13v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
                             <div>
                                 <h2 id="snapshot-title">Performance snapshot</h2>
-                                <p class="panel-subtitle">A normalized view of the metrics that matter most</p>
+                                <p class="panel-subtitle" data-snapshot-subtitle>A normalized view of the metrics that matter most</p>
                             </div>
                         </div>
-                        <div class="legend" aria-label="Chart legend">
-                            <span class="legend-item"><span class="legend-swatch" style="--swatch:var(--violet)"></span>Distance engagement</span>
-                            <span class="legend-item"><span class="legend-swatch" style="--swatch:var(--cyan)"></span>Time engagement</span>
-                            <span class="legend-item"><span class="legend-swatch" style="--swatch:var(--orange)"></span>Disengagement rate</span>
+                        <div class="panel-tools">
+                            <div class="snapshot-mode" aria-label="Performance snapshot view">
+                                <button type="button" data-snapshot-mode="devices" aria-pressed="true">Devices</button>
+                                <button type="button" data-snapshot-mode="speed" aria-pressed="false"{% if not comparison.speed_bucket_groups %} aria-disabled="true" title="No speed bucket data for these filters"{% endif %}>Speed buckets</button>
+                            </div>
+                            <div class="legend" aria-label="Chart legend">
+                                <span class="legend-item"><span class="legend-swatch" style="--swatch:var(--violet)"></span>Distance engagement</span>
+                                <span class="legend-item"><span class="legend-swatch" style="--swatch:var(--cyan)"></span>Time engagement</span>
+                                <span class="legend-item"><span class="legend-swatch" style="--swatch:var(--orange)"></span>Disengagement rate</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="snapshot" data-snapshot>
+                    <div class="snapshot" data-snapshot="devices" data-sort-rows="true">
                         <div class="snapshot-header" aria-hidden="true">
                             <div>Device</div>
                             <div>Distance engagement</div>
@@ -1534,7 +1743,7 @@
                                 <div class="bar-metric">
                                     <div class="bar-values">
                                         <span class="bar-value">{% if row.distance_engagement_pct is not none %}{{ row.distance_engagement_pct | round(1) }}%{% else %}—{% endif %}</span>
-                                        <span class="bar-context">{{ row.engaged_distance_km | round(0) }} km engaged</span>
+                                        <span class="bar-context">{{ row.engaged_distance_km | round(1) }}/{{ row.distance_km | round(1) }} km engaged</span>
                                     </div>
                                     <div class="bar-track"><div class="bar-fill" style="--bar-width: {{ row.distance_engagement_pct if row.distance_engagement_pct is not none else 0 }}%; --bar-color: var(--violet);"></div></div>
                                 </div>
@@ -1555,6 +1764,63 @@
                             </article>
                         {% endfor %}
                     </div>
+                    {% if comparison.speed_bucket_groups %}
+                        <div class="snapshot speed-snapshot" data-snapshot="speed" hidden>
+                            {% for group in comparison.speed_bucket_groups %}
+                                <section class="speed-group" data-bucket="{{ group.key }}" data-rate-scope aria-label="{{ group.label }} device comparison">
+                                    <div class="speed-group-head">
+                                        <span class="speed-group-mark" aria-hidden="true">{% if group.key == 'city' %}≤55{% elif group.key == 'road' %}55–90{% else %}90+{% endif %}</span>
+                                        <div>
+                                            <h3 class="speed-group-title">{{ group.label }}</h3>
+                                            <p class="speed-group-meta">{{ group.rows | length }} device{% if group.rows | length != 1 %}s{% endif %} · {{ group.distance_km | round(1) }} km sampled</p>
+                                        </div>
+                                        <span class="speed-group-count">Ranked by distance engagement</span>
+                                    </div>
+                                    <div class="speed-group-body">
+                                        <div class="snapshot-header" aria-hidden="true">
+                                            <div>Device</div>
+                                            <div>Distance engagement</div>
+                                            <div>Time engagement</div>
+                                            <div>Disengagements / 100 km</div>
+                                        </div>
+                                        {% for row in group.rows %}
+                                            <article class="snapshot-row" data-engagement="{{ row.distance_engagement_pct if row.distance_engagement_pct is not none else -1 }}">
+                                                <div class="driver-cell">
+                                                    <span class="rank" title="Distance engagement rank">{{ loop.index }}</span>
+                                                    <span class="driver-avatar" aria-hidden="true">{{ row.device_id[:2] }}</span>
+                                                    <div class="driver-text">
+                                                        <div class="driver-name" title="{{ row.device_id }}">{{ row.device_id }}</div>
+                                                        <div class="driver-meta">{{ row.drive_count }} drives · {{ row.distance_km | round(1) }} km</div>
+                                                    </div>
+                                                </div>
+                                                <div class="bar-metric" data-label="Distance engagement">
+                                                    <div class="bar-values">
+                                                        <span class="bar-value">{% if row.distance_engagement_pct is not none %}{{ row.distance_engagement_pct | round(1) }}%{% else %}—{% endif %}</span>
+                                                        <span class="bar-context">{{ row.engaged_distance_km | round(1) }}/{{ row.distance_km | round(1) }} km engaged</span>
+                                                    </div>
+                                                    <div class="bar-track"><div class="bar-fill" style="--bar-width: {{ row.distance_engagement_pct if row.distance_engagement_pct is not none else 0 }}%; --bar-color: var(--violet);"></div></div>
+                                                </div>
+                                                <div class="bar-metric" data-label="Time engagement">
+                                                    <div class="bar-values">
+                                                        <span class="bar-value">{% if row.time_engagement_pct is not none %}{{ row.time_engagement_pct | round(1) }}%{% else %}—{% endif %}</span>
+                                                        <span class="bar-context">{{ row.time_hours | round(1) }} h observed</span>
+                                                    </div>
+                                                    <div class="bar-track"><div class="bar-fill" style="--bar-width: {{ row.time_engagement_pct if row.time_engagement_pct is not none else 0 }}%; --bar-color: var(--cyan);"></div></div>
+                                                </div>
+                                                <div class="bar-metric" data-label="Disengagements / 100 km" data-rate="{{ row.disengagements_per_100km if row.disengagements_per_100km is not none else 0 }}">
+                                                    <div class="bar-values">
+                                                        <span class="bar-value">{% if row.disengagements_per_100km is not none %}{{ row.disengagements_per_100km | round(2) }}{% else %}—{% endif %}</span>
+                                                        <span class="bar-context">lower is better</span>
+                                                    </div>
+                                                    <div class="bar-track"><div class="bar-fill rate-bar" style="--bar-width: 0%; --bar-color: var(--orange);"></div></div>
+                                                </div>
+                                            </article>
+                                        {% endfor %}
+                                    </div>
+                                </section>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </section>
 
                 <section class="panel table-panel" aria-labelledby="details-title">
@@ -1790,24 +2056,62 @@
                 button.disabled = true;
             });
 
-            const snapshot = document.querySelector('[data-snapshot]');
-            if (snapshot) {
+            const prepareSnapshot = (snapshot) => {
                 const rows = [...snapshot.querySelectorAll('.snapshot-row')];
-                rows.sort((a, b) => Number(b.dataset.engagement) - Number(a.dataset.engagement));
-                rows.forEach((row, index) => {
-                    row.querySelector('[data-rank]').textContent = index + 1;
-                    snapshot.appendChild(row);
-                });
+                if (snapshot.dataset.sortRows === 'true') {
+                    rows.sort((a, b) => Number(b.dataset.engagement) - Number(a.dataset.engagement));
+                    rows.forEach((row, index) => {
+                        row.querySelector('[data-rank]').textContent = index + 1;
+                        snapshot.appendChild(row);
+                    });
+                }
 
-                const rates = rows.map((row) => Number(row.querySelector('[data-rate]')?.dataset.rate || 0));
-                const maxRate = Math.max(...rates, 0.01);
-                rows.forEach((row) => {
-                    const metric = row.querySelector('[data-rate]');
-                    const rate = Number(metric?.dataset.rate || 0);
-                    const bar = metric?.querySelector('.rate-bar');
-                    if (bar) bar.style.setProperty('--bar-width', `${Math.min((rate / maxRate) * 100, 100)}%`);
+                const rateScopes = [...snapshot.querySelectorAll('[data-rate-scope]')];
+                (rateScopes.length ? rateScopes : [snapshot]).forEach((scope) => {
+                    const scopeRows = [...scope.querySelectorAll('.snapshot-row')];
+                    const rates = scopeRows.map((row) => Number(row.querySelector('[data-rate]')?.dataset.rate || 0));
+                    const maxRate = Math.max(...rates, 0.01);
+                    scopeRows.forEach((row) => {
+                        const metric = row.querySelector('[data-rate]');
+                        const rate = Number(metric?.dataset.rate || 0);
+                        const bar = metric?.querySelector('.rate-bar');
+                        if (bar) bar.style.setProperty('--bar-width', `${Math.min((rate / maxRate) * 100, 100)}%`);
+                    });
                 });
-            }
+            };
+
+            const snapshots = [...document.querySelectorAll('[data-snapshot]')];
+            snapshots.forEach(prepareSnapshot);
+
+            const snapshotModeButtons = [...document.querySelectorAll('[data-snapshot-mode]')];
+            const snapshotSubtitle = document.querySelector('[data-snapshot-subtitle]');
+            const showSnapshot = (mode) => {
+                const requestedSnapshot = snapshots.find((snapshot) => snapshot.dataset.snapshot === mode);
+                if (!requestedSnapshot) {
+                    if (snapshotSubtitle) snapshotSubtitle.textContent = 'No speed bucket data for the selected filters';
+                    return;
+                }
+                snapshotModeButtons.forEach((item) => {
+                    item.setAttribute('aria-pressed', String(item.dataset.snapshotMode === mode));
+                });
+                snapshots.forEach((snapshot) => {
+                    snapshot.hidden = snapshot !== requestedSnapshot;
+                });
+                if (snapshotSubtitle) {
+                    snapshotSubtitle.textContent = mode === 'speed'
+                        ? 'Compare selected devices within each speed range · rate bars scaled per range'
+                        : 'A normalized view of the metrics that matter most';
+                }
+                try { sessionStorage.setItem('comparisonSnapshotMode', mode); } catch (_) {}
+            };
+            snapshotModeButtons.forEach((button) => {
+                button.addEventListener('click', () => showSnapshot(button.dataset.snapshotMode));
+            });
+            try {
+                if (sessionStorage.getItem('comparisonSnapshotMode') === 'speed' && snapshots.some((snapshot) => snapshot.dataset.snapshot === 'speed')) {
+                    showSnapshot('speed');
+                }
+            } catch (_) {}
 
             const table = document.getElementById('comparison-table');
             if (table) {
