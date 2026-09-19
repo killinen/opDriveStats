@@ -3,6 +3,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from starlette.requests import Request
+
+from server.app import templates
 from server.data import EngagementRepository
 
 
@@ -54,6 +57,31 @@ class NonIntersectionSummaryTests(unittest.TestCase):
             repository = EngagementRepository(db_path)
             self.assertIsNone(repository.device_summary('one')['non_intersection_disengagement_count'])
             self.assertIsNone(repository.comparison_summary()['totals']['non_intersection_disengagements_per_100km'])
+
+    def test_templates_render_with_a_backend_missing_new_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = Path(directory) / 'engagement_db.json'
+            db_path.write_text(json.dumps([{
+                'device_id': 'one', 'drive': '2026-09-18--10-00-00',
+                'odo_distance': 100.0, 'engaged_distance': 80.0,
+                'total_time': 3_600_000_000_000, 'drive_time_active': 2_800_000_000_000,
+            }]), encoding='utf-8')
+            repository = EngagementRepository(db_path)
+            comparison = repository.comparison_summary()
+            summary = repository.grand_total_summary()
+
+            for row in [*comparison['rows'], comparison['totals'], summary, *summary['speed_bucket_summary'].values()]:
+                for key in tuple(row):
+                    if key.startswith(('non_intersection', 'raw_non_intersection', 'blinker_related')):
+                        del row[key]
+
+            request = Request({'type': 'http', 'method': 'GET', 'path': '/', 'headers': []})
+            for template_name, context in [
+                ('compare.html', {'comparison': comparison}),
+                ('total_stats.html', {'summary': summary}),
+            ]:
+                html = templates.env.get_template(template_name).render(request=request, **context)
+                self.assertIn('Non-intersection', html)
 
 
 if __name__ == '__main__':
