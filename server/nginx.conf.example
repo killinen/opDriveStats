@@ -29,7 +29,7 @@ server {
     # Security headers (optional tweaks welcome)
     add_header X-Content-Type-Options nosniff;
     add_header X-Frame-Options DENY;
-    add_header Referrer-Policy no-referrer-when-downgrade;
+    add_header Referrer-Policy no-referrer always;
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
 
     access_log /var/log/nginx/engagement_gauge_access.log;

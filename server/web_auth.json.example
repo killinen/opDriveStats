@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "public_url": "https://openpilotstats.duckdns.org",
+  "owner_email": "your-address@gmail.com",
+  "secret": "REPLACE_WITH_A_RANDOM_SECRET_OF_AT_LEAST_32_CHARACTERS",
+  "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+  "client_secret": "YOUR_GOOGLE_CLIENT_SECRET"
+}

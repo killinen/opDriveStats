@@ -4,12 +4,12 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from .data import repository
 from .drive_stats_sync import DriveStatsSyncConfig, DriveStatsSynchronizer
+from .web_auth import install_auth, csrf_token
 
 
 @asynccontextmanager
@@ -36,28 +36,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=['*'],
-    allow_methods=['*'],
-    allow_headers=['*'],
-)
-
-
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / 'templates'))
+install_auth(app, templates)
 
 
 @app.get('/', summary='Engagement Gauge home', response_class=HTMLResponse)
 def home_view(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         'index.html',
-        {'request': request, 'last_loaded': repository.last_updated()},
+        {'request': request, 'last_loaded': repository.last_updated(),
+         'principal': request.state.principal,
+         'csrf': csrf_token(request) if request.state.principal else None},
     )
 
 
 @app.get('/health', summary='Health check')
 def health() -> dict:
-    return {'status': 'ok', 'last_loaded': repository.last_updated()}
+    return {'status': 'ok'}
 
 
 @app.get('/devices', summary='List devices with engagement summaries')

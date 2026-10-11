@@ -7,3 +7,5 @@ database_backups/*.bak
 .drive_stats_source_token
 .drive_stats_cursor.json
 .drive_stats_sync.lock
+.web_auth.json
+.web_auth.sqlite3*

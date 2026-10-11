@@ -64,6 +64,22 @@
     <main>
         <h1>Engagement Gauge</h1>
         <p>Choose a dashboard or data endpoint.</p>
+        {% if principal %}
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:16px">
+            {% if principal.role == 'owner' %}
+            <a href="/access" style="color:var(--accent)">Manage access · Google accounts &amp; guest links</a>
+            {% elif principal.role == 'guest' %}
+            <p>Guest access expires <time id="guest-expiry" data-timestamp="{{ principal.expires_at }}"></time>.</p>
+            <script>const expiry = document.getElementById('guest-expiry'); expiry.textContent = new Date(Number(expiry.dataset.timestamp) * 1000).toLocaleString();</script>
+            {% else %}
+            <p>Signed in as {{ principal.email }}</p>
+            {% endif %}
+            <form method="post" action="/auth/logout">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button type="submit" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer">Sign out</button>
+            </form>
+        </div>
+        {% endif %}
         <p class="updated">
             {% if last_loaded %}Last refreshed: {{ last_loaded | replace('T', ' ') }}{% else %}Waiting for first data sync…{% endif %}
         </p>

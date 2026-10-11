@@ -1,0 +1,79 @@
+{% extends "auth_base.html" %}
+{% block title %}Share access · Engagement Gauge{% endblock %}
+{% block content %}
+  <h1>Choose who gets access.</h1>
+  <p>Add a Google account for ongoing access, or share a guest link for one day.</p>
+  <h2>Google accounts</h2>
+  <p class="small">{{ owner_email }} · Owner</p>
+  <form method="post" action="/access/members">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="member-email">Google account email</label>
+    <input id="member-email" name="email" type="email" required maxlength="254" placeholder="friend@gmail.com" autocomplete="email">
+    <button type="submit">Allow this account</button>
+  </form>
+  {% if members %}
+    <table>
+      <caption style="text-align:left; margin-top:24px">Approved accounts</caption>
+      <thead><tr><th>Email</th><th>Access</th><th>Action</th></tr></thead>
+      <tbody>{% for member in members %}
+        <tr>
+          <td style="overflow-wrap:anywhere">{{ member.email }}</td><td>Viewer</td>
+          <td><form method="post" action="/access/members/remove">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="email" value="{{ member.email }}">
+            <button type="submit" aria-label="Remove access for {{ member.email }}">Remove</button>
+          </form></td>
+        </tr>
+      {% endfor %}</tbody>
+    </table>
+  {% endif %}
+  <h2 style="margin-top:36px">24-hour guest links</h2>
+  <p>Share a view of all dashboards and their data. Each link expires 24 hours after creation. Anyone with the link can use it until then.</p>
+  <form method="post" action="/access/links">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit">Create a 24-hour link</button>
+  </form>
+  {% if new_link %}
+    <section class="notice" style="margin-top: 24px" aria-live="polite">
+      <label for="share-link">Your new guest link</label>
+      <input id="share-link" readonly value="{{ new_link }}">
+      <button type="button" id="copy-link">Copy link</button>
+      <p class="small">Expires <time data-timestamp="{{ expires_at }}"></time>. Copy it now; it is only shown once.</p>
+    </section>
+  {% endif %}
+  {% if shares %}
+    <table>
+      <caption style="text-align:left; margin-top:24px">Recent guest links</caption>
+      <thead><tr><th>Link</th><th>Expires</th><th>Status</th><th><span aria-label="Actions"></span></th></tr></thead>
+      <tbody>{% for share in shares %}
+        <tr>
+          <td>#{{ share.id }}</td>
+          <td><time data-timestamp="{{ share.expires_at }}"></time></td>
+          <td>{% if share.revoked %}Revoked{% elif share.expires_at <= now %}Expired{% else %}Active{% endif %}</td>
+          <td>{% if not share.revoked and share.expires_at > now %}
+            <form method="post" action="/access/links/{{ share.id }}/revoke">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button type="submit" aria-label="Revoke link {{ share.id }}">Revoke</button>
+            </form>
+          {% endif %}</td>
+        </tr>
+      {% endfor %}</tbody>
+    </table>
+  {% endif %}
+  <div class="footer">
+    <a href="/">Back to dashboards</a>
+    <form method="post" action="/auth/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Sign out</button></form>
+  </div>
+  <script>
+    document.querySelectorAll('time[data-timestamp]').forEach(element => {
+      const date = new Date(Number(element.dataset.timestamp) * 1000);
+      element.dateTime = date.toISOString();
+      element.textContent = date.toLocaleString();
+    });
+    document.getElementById('copy-link')?.addEventListener('click', async event => {
+      const input = document.getElementById('share-link');
+      try { await navigator.clipboard.writeText(input.value); event.target.textContent = 'Copied'; }
+      catch { input.focus(); input.select(); event.target.textContent = 'Select and copy the link above'; }
+    });
+  </script>
+{% endblock %}

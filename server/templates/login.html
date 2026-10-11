@@ -1,0 +1,13 @@
+{% extends "auth_base.html" %}
+{% block title %}Sign in · Engagement Gauge{% endblock %}
+{% block content %}
+  <h1>Your drives. Your dashboard.</h1>
+  <p>Sign in with your approved Google account to view your engagement statistics.</p>
+  {% if message %}<p role="alert" class="notice error">{{ message }}</p>{% endif %}
+  {% if ready %}
+    <a class="button" href="/auth/google?next={{ next | urlencode }}">Sign in with Google <span aria-hidden="true">↗</span></a>
+    <p class="small">Visiting as a guest? Open the share link sent by the owner. Guest access lasts until the link expires, 24 hours after it was created.</p>
+  {% else %}
+    <p class="notice">Private access is being set up. Please come back once the owner has enabled Google sign-in.</p>
+  {% endif %}
+{% endblock %}
