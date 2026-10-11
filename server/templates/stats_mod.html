@@ -4,20 +4,24 @@
     <meta charset="utf-8">
     <title>Engagement Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Crect%20x%3D%276%27%20y%3D%2726%27%20width%3D%2752%27%20height%3D%2718%27%20rx%3D%278%27%20fill%3D%27%23f43f5e%27%2F%3E%3Cpath%20d%3D%27M18%2026l6-10h16l6%2010%27%20fill%3D%27%23f87171%27%2F%3E%3Ccircle%20cx%3D%2720%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230b1020%27%2F%3E%3Ccircle%20cx%3D%2744%27%20cy%3D%2744%27%20r%3D%276%27%20fill%3D%27%230b1020%27%2F%3E%3Ccircle%20cx%3D%2720%27%20cy%3D%2744%27%20r%3D%273%27%20fill%3D%27%23dbeafe%27%2F%3E%3Ccircle%20cx%3D%2744%27%20cy%3D%2744%27%20r%3D%273%27%20fill%3D%27%23dbeafe%27%2F%3E%3C%2Fsvg%3E">
+    <meta name="theme-color" content="#080b12">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2310121b'/%3E%3Cpath d='M13 38a19 19 0 0 1 38 0' fill='none' stroke='%238b5cf6' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='m32 36 10-13' stroke='%236ee7f2' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='38' r='5' fill='%23f8fafc'/%3E%3C/svg%3E">
     <style>
         :root {
             color-scheme: dark;
-            --bg: #0b1020;
-            --bg-card: rgba(19, 26, 48, 0.9);
-            --bg-card-hover: rgba(26, 35, 63, 0.95);
-            --border: rgba(120, 148, 255, 0.25);
-            --accent: #7f8cff;
-            --accent-soft: rgba(127, 140, 255, 0.15);
-            --text: #f5f7ff;
-            --text-muted: #a8b2d6;
-            --chip-bg: rgba(127, 140, 255, 0.15);
-            --chip-text: #d7dcff;
+            --page: #080b12;
+            --panel: #10141d;
+            --panel-raised: #141925;
+            --panel-soft: #0c1018;
+            --line: #252b38;
+            --line-strong: #343c4d;
+            --text: #f5f7fb;
+            --muted: #8c96a8;
+            --muted-bright: #b9c0cc;
+            --violet: #9b87f5;
+            --violet-soft: rgba(139, 112, 246, 0.13);
+            --cyan: #70d7e2;
+            --green: #72d6a0;
         }
 
         * {
@@ -26,145 +30,328 @@
 
         body {
             margin: 0;
-            font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: radial-gradient(circle at top left, rgba(127, 140, 255, 0.18), transparent 45%),
-                        radial-gradient(circle at bottom right, rgba(74, 222, 255, 0.2), transparent 50%),
-                        var(--bg);
+            min-width: 320px;
+            font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at 12% -8%, rgba(128, 102, 237, 0.14), transparent 27rem),
+                        radial-gradient(circle at 93% 16%, rgba(112, 215, 226, 0.08), transparent 25rem),
+                        var(--page);
             color: var(--text);
             min-height: 100vh;
-            padding: 24px;
+            -webkit-font-smoothing: antialiased;
         }
 
         .page {
-            max-width: 1680px;
+            width: min(1640px, calc(100% - 48px));
             margin: 0 auto;
+            padding-bottom: 56px;
         }
 
-        header.page-header {
+        .topbar {
+            min-height: 76px;
             display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-            margin-bottom: 32px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 28px;
+            border-bottom: 1px solid rgba(52, 60, 77, 0.65);
         }
 
-        header.page-header h1 {
-            font-size: 2rem;
-            margin: 0;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-        }
-
-        .last-loaded {
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 11px;
+            color: var(--text);
+            text-decoration: none;
             font-size: 0.95rem;
-            color: var(--text-muted);
-            align-self: stretch;
+            font-weight: 760;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-mark {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 10px;
+            color: var(--violet);
+            background: linear-gradient(145deg, #181d2a, #0e121b);
+            border: 1px solid var(--line-strong);
+        }
+
+        .brand-mark svg { width: 18px; height: 18px; display: block; }
+        .brand-product { color: var(--muted); font-weight: 520; }
+
+        .topbar-right,
+        .nav {
             display: flex;
+            align-items: center;
+        }
+
+        .nav { gap: 5px; }
+
+        .nav a {
+            display: inline-flex;
+            align-items: center;
+            min-height: 38px;
+            padding: 0 13px;
+            color: var(--muted-bright);
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            font-weight: 650;
+        }
+
+        .nav a:hover { color: var(--text); background: rgba(255, 255, 255, 0.045); }
+        .nav a[aria-current="page"] { color: #e8e3ff; background: var(--violet-soft); }
+
+        .sync-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 8px;
+            padding-left: 16px;
+            border-left: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 0 4px rgba(114, 214, 160, 0.1);
+        }
+
+        .hero {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 30px;
+            padding: 58px 0 34px;
+        }
+
+        .eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin: 0 0 14px;
+            color: var(--violet);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before { content: ""; width: 18px; height: 1px; background: currentColor; }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(2.15rem, 4.1vw, 4.25rem);
+            line-height: 0.98;
+            letter-spacing: -0.055em;
+            font-weight: 740;
+        }
+
+        .hero-copy {
+            margin: 18px 0 0;
+            color: var(--muted-bright);
+            font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+            line-height: 1.65;
+        }
+
+        .hero-meta {
+            flex: 0 0 auto;
+            padding-bottom: 5px;
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-align: right;
+        }
+
+        .hero-meta strong {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted-bright);
+            font-size: 0.84rem;
+            font-weight: 650;
+        }
+
+        .section-label {
+            display: flex;
+            align-items: center;
             justify-content: space-between;
             gap: 12px;
+            margin: 4px 2px 14px;
+            color: var(--muted);
+            font-size: 0.74rem;
         }
 
-        .last-loaded a {
-            color: #7dd3fc;
-            text-decoration: none;
-        }
+        .section-label strong { color: var(--text); font-weight: 650; }
+        .empty-state { color: var(--muted-bright); }
 
-        .last-loaded a:hover {
-            text-decoration: underline;
+        :focus-visible {
+            outline: 2px solid var(--violet);
+            outline-offset: 3px;
         }
 
         .device-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 32px;
+            gap: 20px;
         }
 
         .device-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 20px;
-            box-shadow: 0 12px 40px rgba(8, 12, 30, 0.45);
-            transition: transform 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .device-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(127, 140, 255, 0.45);
-            box-shadow: 0 18px 48px rgba(8, 12, 30, 0.55);
+            overflow: hidden;
+            background: rgba(16, 20, 29, 0.9);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            box-shadow: 0 14px 45px rgba(0, 0, 0, 0.14);
         }
 
         .device-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 20px;
+            padding: 22px 24px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .device-heading {
+            min-width: 0;
+        }
+
+        .device-kicker {
+            margin: 0 0 8px;
+            color: var(--muted);
+            font-size: 0.7rem;
+            font-weight: 760;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
         }
 
         .device-id {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            font-weight: 600;
-            font-size: 1.05rem;
-            padding: 6px 12px;
-            border-radius: 999px;
-            background: var(--chip-bg);
-            color: var(--chip-text);
+            gap: 9px;
+            min-width: 0;
+            color: var(--text);
+            font-weight: 700;
+            font-size: 1.2rem;
+            letter-spacing: -0.025em;
+            overflow-wrap: anywhere;
+        }
+
+        .device-id::before {
+            content: "";
+            flex: 0 0 auto;
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            background: var(--violet);
         }
 
         .meta-window {
-            font-size: 0.85rem;
-            color: var(--text-muted);
+            font-size: 0.75rem;
+            color: var(--muted);
             display: flex;
-            flex-direction: column;
-            gap: 4px;
+            gap: 18px;
             text-align: right;
         }
 
+        .meta-window strong { display: block; margin-top: 5px; color: var(--muted-bright); font-size: 0.83rem; font-weight: 650; }
+
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            padding: 20px 24px;
         }
 
         .metric {
-            padding: 12px;
-            border-radius: 14px;
-            background: rgba(127, 140, 255, 0.08);
-            border: 1px solid rgba(127, 140, 255, 0.12);
+            min-width: 0;
+            min-height: 112px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 17px 18px;
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(20, 25, 37, 0.96), rgba(14, 18, 27, 0.96));
+            border: 1px solid var(--line);
         }
 
         .metric-label {
-            font-size: 0.75rem;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 8px;
+            font-size: 0.76rem;
+            font-weight: 620;
+            color: var(--muted-bright);
         }
 
         .metric-value {
-            font-size: 1.25rem;
-            font-weight: 600;
+            margin-top: 18px;
+            font-size: clamp(1.38rem, 2vw, 1.95rem);
+            font-weight: 720;
+            line-height: 1;
+            letter-spacing: -0.04em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .speed-section {
+            padding: 0 24px 22px;
+        }
+
+        .speed-title {
+            margin: 0 0 12px;
+            color: var(--muted-bright);
+            font-size: 0.78rem;
+            font-weight: 750;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .speed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+            gap: 12px;
+        }
+
+        .speed-card {
+            min-width: 0;
+            padding: 16px 18px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel-soft);
+        }
+
+        .speed-card:nth-child(3n + 2) { border-top-color: rgba(112, 215, 226, 0.4); }
+        .speed-card:nth-child(3n + 3) { border-top-color: rgba(242, 166, 90, 0.4); }
+        .speed-card .metric-label { color: var(--text); font-size: 0.86rem; font-weight: 700; }
+        .speed-distance { margin: 8px 0 16px; color: var(--muted); font-size: 0.77rem; }
+        .speed-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .speed-stat-label { color: var(--muted); font-size: 0.69rem; }
+        .speed-stat-value { margin-top: 5px; color: var(--muted-bright); font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+        .no-drives { margin: 0; padding: 0 24px 24px; color: var(--muted); font-size: 0.82rem; }
+
+        .table-wrap {
+            overflow-x: auto;
+            scrollbar-color: var(--line-strong) var(--panel-soft);
         }
 
         details.drive-table {
-            margin-top: 20px;
-            background: rgba(15, 20, 38, 0.85);
-            border-radius: 14px;
-            border: 1px solid rgba(127, 140, 255, 0.12);
-            overflow: hidden;
+            border-top: 1px solid var(--line);
+            background: var(--panel-soft);
         }
 
         details.drive-table > summary {
             list-style: none;
             cursor: pointer;
-            padding: 14px 16px;
-            font-weight: 600;
+            padding: 18px 24px;
+            font-size: 0.86rem;
+            font-weight: 700;
             position: relative;
         }
+
+        details.drive-table > summary:hover { background: rgba(255, 255, 255, 0.025); }
 
         details.drive-table > summary::-webkit-details-marker {
             display: none;
@@ -174,7 +361,7 @@
             content: '▾';
             font-size: 0.8rem;
             position: absolute;
-            right: 18px;
+            right: 24px;
             top: 50%;
             transform: translateY(-50%) rotate(-90deg);
             transition: transform 0.2s ease;
@@ -186,33 +373,47 @@
 
         .drive-table table {
             width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.77rem;
             min-width: 1100px;
+            font-variant-numeric: tabular-nums;
         }
 
         .drive-table thead {
-            background: rgba(127, 140, 255, 0.12);
+            background: #0e121b;
         }
 
         .drive-table th,
         .drive-table td {
-            padding: 10px 12px;
+            padding: 14px 12px;
             text-align: left;
-            border-bottom: 1px solid rgba(127, 140, 255, 0.08);
+            border-bottom: 1px solid var(--line);
+            white-space: nowrap;
         }
 
-        .drive-table tbody tr:hover {
-            background: rgba(127, 140, 255, 0.08);
+        .drive-table th {
+            color: var(--muted);
+            font-size: 0.66rem;
+            font-weight: 760;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+        }
+
+        .drive-table td { color: var(--muted-bright); }
+
+        .drive-table tbody tr:hover td {
+            color: var(--text);
+            background: var(--panel-raised);
         }
 
         .table-controls {
             display: flex;
             flex-wrap: wrap;
             gap: 10px 16px;
-            padding: 14px 16px;
-            background: rgba(127, 140, 255, 0.08);
-            border-bottom: 1px solid rgba(127, 140, 255, 0.12);
+            padding: 15px 24px;
+            background: rgba(255, 255, 255, 0.015);
+            border-bottom: 1px solid var(--line);
         }
 
         .table-controls label {
@@ -221,80 +422,95 @@
             align-items: center;
             gap: 6px;
             cursor: pointer;
-            color: var(--text-muted);
+            color: var(--muted);
         }
 
+        .table-controls input { accent-color: var(--violet); }
+
+        .table-controls label:hover { color: var(--text); }
+
         input[type="checkbox"] {
-            accent-color: var(--accent);
+            accent-color: var(--violet);
         }
 
         .hidden-column {
             display: none !important;
         }
 
-        .drive-table td[data-label] {
-            position: relative;
+        @media (max-width: 900px) {
+            .page { width: min(100% - 28px, 1640px); }
+            .topbar { min-height: 68px; }
+            .sync-status { display: none; }
+            .hero { padding-top: 43px; }
+            .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
-        @media (max-width: 960px) {
-            body {
-                padding: 16px;
-            }
+        @media (max-width: 650px) {
+            .page { width: min(100% - 20px, 1640px); padding-bottom: 30px; }
+            .brand-product { display: none; }
+            .nav { gap: 0; }
+            .nav a { min-height: 34px; padding: 0 9px; font-size: 0.76rem; }
+            .nav a[href="/total_stats"], .nav a[href="/api/compare"] { display: none; }
+            .hero { display: block; padding: 34px 3px 24px; }
+            .hero-meta { margin-top: 16px; text-align: left; }
+            .hero-meta strong { display: inline; margin-left: 6px; }
+            .device-header { align-items: flex-start; flex-direction: column; padding: 18px; }
+            .meta-window { text-align: left; flex-wrap: wrap; }
+            .metrics-grid { padding: 16px; gap: 8px; }
+            .metric { min-height: 105px; padding: 13px; }
+            .metric-label { font-size: 0.69rem; }
+            .metric-value { font-size: 1.35rem; }
+            .speed-section { padding: 0 16px 18px; }
+            .speed-grid { grid-template-columns: 1fr; }
+            .table-controls { padding: 13px 16px; }
+        }
 
-            .device-grid {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 390px) {
+            .brand { font-size: 0.83rem; }
+            .brand-mark { width: 30px; height: 30px; }
+            .nav a[href="/compare"] { padding-right: 0; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            .metric { min-height: 90px; }
+        }
 
-            .drive-table table,
-            .drive-table thead,
-            .drive-table tbody,
-            .drive-table th,
-            .drive-table td,
-            .drive-table tr {
-                display: block;
-            }
-
-            .drive-table thead {
-                display: none;
-            }
-
-            .drive-table td {
-                padding: 8px 16px;
-                border-bottom: none;
-                border-left: 3px solid rgba(127, 140, 255, 0.15);
-                margin-bottom: 10px;
-            }
-
-            .drive-table td::before {
-                content: attr(data-label);
-                display: block;
-                font-size: 0.7rem;
-                letter-spacing: 0.08em;
-                text-transform: uppercase;
-                color: var(--text-muted);
-                margin-bottom: 4px;
-            }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
         }
     </style>
 </head>
 <body>
     <div class="page">
-        <header class="page-header">
-            <h1>Engagement Dashboard</h1>
-            <div class="last-loaded">
-                <span>
-                    {% if last_loaded %}
-                        Last refreshed: {{ last_loaded | replace('T', ' ') }}
-                    {% else %}
-                        Waiting for first data sync…
-                    {% endif %}
-                </span>
-                <span><a href="/compare">Compare devices</a></span>
+        <header class="topbar">
+            <a class="brand" href="/stats_mod" aria-label="Engagement Gauge dashboard">
+                <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 16a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m12 15 4-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16" r="1.7" fill="currentColor"/></svg></span>
+                <span>Engagement Gauge <span class="brand-product">/ Insights</span></span>
+            </a>
+            <div class="topbar-right">
+                <nav class="nav" aria-label="Primary navigation">
+                    <a href="/stats_mod" aria-current="page">Dashboard</a>
+                    <a href="/compare">Compare</a>
+                    <a href="/total_stats">Fleet totals</a>
+                    <a href="/api/compare">API</a>
+                </nav>
+                <div class="sync-status"><span class="status-dot" aria-hidden="true"></span>{% if last_loaded %}Data ready{% else %}Awaiting data{% endif %}</div>
             </div>
         </header>
 
+        <main>
+        <section class="hero" aria-labelledby="page-title">
+            <div>
+                <p class="eyebrow">Device performance</p>
+                <h1 id="page-title">Engagement dashboard.</h1>
+                <p class="hero-copy">Explore engagement, interventions, and drive history for each device.</p>
+            </div>
+            <div class="hero-meta">
+                {% if last_loaded %}Last refreshed<strong>{{ last_loaded | replace('T', ' ') }}</strong>{% else %}Waiting for first data sync…{% endif %}
+            </div>
+        </section>
+        <div class="section-label"><span><strong>{{ devices | length }} device{% if devices | length != 1 %}s{% endif %}</strong> in the dashboard</span><span>Per-device summary</span></div>
+
         {% if not devices %}
-            <p style="color: var(--text-muted); font-size: 1.05rem;">No engagement data available.</p>
+            <p class="empty-state">No engagement data available.</p>
         {% endif %}
 
         <div class="device-grid">
@@ -302,10 +518,13 @@
                 {% set summary = device.summary %}
                 <section class="device-card">
                     <div class="device-header">
-                        <span class="device-id">🚗 {{ summary.device_id }}</span>
+                        <div class="device-heading">
+                            <p class="device-kicker">Device overview</p>
+                            <span class="device-id">{{ summary.device_id }}</span>
+                        </div>
                         <div class="meta-window">
-                            <span>First drive: {{ summary.first_drive | default('—') }}</span>
-                            <span>Latest drive: {{ summary.latest_drive | default('—') }}</span>
+                            <span>First drive<strong>{{ summary.first_drive | default('—') }}</strong></span>
+                            <span>Latest drive<strong>{{ summary.latest_drive | default('—') }}</strong></span>
                         </div>
                     </div>
 
@@ -373,19 +592,19 @@
                     </div>
 
                     {% if summary.speed_bucket_summary %}
-                        <section style="margin-top: 18px;">
-                            <h3 style="margin: 0 0 12px 0; font-size: 1rem; color: var(--text-muted); letter-spacing: 0.04em;">Speed Buckets</h3>
-                            <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                        <section class="speed-section">
+                            <h3 class="speed-title">Speed buckets</h3>
+                            <div class="speed-grid">
                                 {% for key, bucket in summary.speed_bucket_summary.items() %}
-                                    <div class="metric" style="padding: 14px;">
-                                        <div class="metric-label" style="margin-bottom: 6px;">{{ bucket.label }}</div>
-                                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">
+                                    <div class="speed-card">
+                                        <div class="metric-label">{{ bucket.label }}</div>
+                                        <div class="speed-distance">
                                             {{ bucket.engaged_distance_km | round(1) }} / {{ bucket.distance_km | round(1) }} km
                                         </div>
-                                        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+                                        <div class="speed-stats">
                                             <div>
-                                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.08em;">Dis/100km</div>
-                                                <div class="metric-value" style="font-size: 1rem;">
+                                                <div class="speed-stat-label">Dis/100km</div>
+                                                <div class="speed-stat-value">
                                                     {% if bucket.disengagements_per_100km is not none %}
                                                         {{ bucket.disengagements_per_100km | round(2) }}
                                                     {% else %}
@@ -394,8 +613,8 @@
                                                 </div>
                                             </div>
                                             <div>
-                                                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.08em;">Steer/100km</div>
-                                                <div class="metric-value" style="font-size: 1rem;">
+                                                <div class="speed-stat-label">Steer/100km</div>
+                                                <div class="speed-stat-value">
                                                     {% if bucket.steer_interventions_per_100km is not none %}
                                                         {{ bucket.steer_interventions_per_100km | round(2) }}
                                                     {% else %}
@@ -427,7 +646,7 @@
                                 <label><input type="checkbox" data-column-toggle="device_type"> Device Type</label>
                                 <label><input type="checkbox" data-column-toggle="git"> Git Commit</label>
                             </div>
-                            <div style="overflow-x: auto;">
+                            <div class="table-wrap" tabindex="0" aria-label="Scrollable drive history table">
                                 <table>
                                     <thead>
                                         <tr>
@@ -549,11 +768,12 @@
                             </div>
                         </details>
                     {% else %}
-                        <p style="margin-top: 16px; color: var(--text-muted);">No drive data available for this device.</p>
+                        <p class="no-drives">No drive data available for this device.</p>
                     {% endif %}
                 </section>
             {% endfor %}
         </div>
+        </main>
     </div>
     <script>
     document.querySelectorAll('details.drive-table').forEach(function(detailEl) {
