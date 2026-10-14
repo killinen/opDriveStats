@@ -891,6 +891,12 @@
             text-transform: uppercase;
         }
 
+        .speed-group .snapshot-header,
+        .speed-group .snapshot-row {
+            grid-template-columns: minmax(190px, 1.15fr) repeat(3, minmax(130px, 1fr)) minmax(100px, 0.7fr);
+            gap: 16px;
+        }
+
         .snapshot-row {
             min-height: 76px;
             padding: 13px 0;
@@ -1782,6 +1788,7 @@
                                             <div>Distance engagement</div>
                                             <div>Time engagement</div>
                                             <div>Disengagements / 100 km</div>
+                                            <div>Average speed</div>
                                         </div>
                                         {% for row in group.rows %}
                                             <article class="snapshot-row" data-engagement="{{ row.distance_engagement_pct if row.distance_engagement_pct is not none else -1 }}">
@@ -1814,6 +1821,9 @@
                                                     </div>
                                                     <div class="bar-track"><div class="bar-fill rate-bar" style="--bar-width: 0%; --bar-color: var(--orange);"></div></div>
                                                 </div>
+                                                <div class="bar-metric" data-label="Average speed">
+                                                    <span class="bar-value">{% if row.get('average_speed_kmh') is not none %}{{ "%.1f" | format(row.average_speed_kmh) }} km/h{% else %}—{% endif %}</span>
+                                                </div>
                                             </article>
                                         {% endfor %}
                                     </div>
@@ -1841,6 +1851,9 @@
                                     <th><button class="sort-button" type="button" data-sort="text">Device</button></th>
                                     <th><button class="sort-button" type="button" data-sort="text">Branch</button></th>
                                     <th><button class="sort-button" type="button" data-sort="number">Distance</button></th>
+                                    {% if comparison.selected_speed_bucket != 'all' %}
+                                        <th><button class="sort-button" type="button" data-sort="number">Average speed</button></th>
+                                    {% endif %}
                                     {% if comparison.selected_speed_bucket == 'all' %}
                                         <th><button class="sort-button" type="button" data-sort="number"><abbr title="Share of distance at city speeds">City %</abbr></button></th>
                                         <th><button class="sort-button" type="button" data-sort="number"><abbr title="Share of distance at road speeds">Road %</abbr></button></th>
@@ -1867,6 +1880,9 @@
                                         <td data-value="{{ row.device_id }}"><span class="device-id">{{ row.device_id }}</span></td>
                                         <td class="branch-cell" data-value="{{ row.branch }}" title="{{ row.branch }}">{{ row.branch }}</td>
                                         <td data-value="{{ row.distance_km }}">{{ row.distance_km | round(1) }} km</td>
+                                        {% if comparison.selected_speed_bucket != 'all' %}
+                                            <td data-value="{{ row.get('average_speed_kmh') if row.get('average_speed_kmh') is not none else -1 }}">{% if row.get('average_speed_kmh') is not none %}{{ "%.1f" | format(row.average_speed_kmh) }} km/h{% else %}—{% endif %}</td>
+                                        {% endif %}
                                         {% if comparison.selected_speed_bucket == 'all' %}
                                             <td data-value="{{ row.speed_mix_pct.city if row.speed_mix_pct.city is not none else -1 }}">{% if row.speed_mix_pct.city is not none %}{{ row.speed_mix_pct.city | round(1) }}%{% else %}—{% endif %}</td>
                                             <td data-value="{{ row.speed_mix_pct.road if row.speed_mix_pct.road is not none else -1 }}">{% if row.speed_mix_pct.road is not none %}{{ row.speed_mix_pct.road | round(1) }}%{% else %}—{% endif %}</td>
@@ -1893,6 +1909,9 @@
                                     <td><span class="total-label">Combined</span></td>
                                     <td>—</td>
                                     <td>{{ comparison.totals.distance_km | round(1) }} km</td>
+                                    {% if comparison.selected_speed_bucket != 'all' %}
+                                        <td>{% if comparison.totals.get('average_speed_kmh') is not none %}{{ "%.1f" | format(comparison.totals.average_speed_kmh) }} km/h{% else %}—{% endif %}</td>
+                                    {% endif %}
                                     {% if comparison.selected_speed_bucket == 'all' %}
                                         <td>{% if comparison.totals.speed_mix_pct.city is not none %}{{ comparison.totals.speed_mix_pct.city | round(1) }}%{% else %}—{% endif %}</td>
                                         <td>{% if comparison.totals.speed_mix_pct.road is not none %}{{ comparison.totals.speed_mix_pct.road | round(1) }}%{% else %}—{% endif %}</td>

@@ -603,6 +603,16 @@
                                         </div>
                                         <div class="speed-stats">
                                             <div>
+                                                <div class="speed-stat-label">Average speed</div>
+                                                <div class="speed-stat-value">
+                                                    {% if bucket.get('average_speed_kmh') is not none %}
+                                                        {{ "%.1f" | format(bucket.average_speed_kmh) }} km/h
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <div>
                                                 <div class="speed-stat-label">Dis/100km</div>
                                                 <div class="speed-stat-value">
                                                     {% if bucket.disengagements_per_100km is not none %}

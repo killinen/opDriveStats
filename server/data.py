@@ -73,6 +73,19 @@ def _round_optional(value: Optional[float], decimals: int = 2) -> Optional[float
     return round(value, decimals)
 
 
+def _bucket_average_speed_kmh(rows: List[Dict[str, Any]], bucket_key: str) -> Optional[float]:
+    """Use raw bucket totals, including stopped time, on drives with both fields."""
+    distance_km = 0.0
+    time_ns = 0
+    for row in rows:
+        bucket = (row.get('speed_buckets') or {}).get(bucket_key) or {}
+        if bucket.get('distance_km_raw') is None or bucket.get('time_ns') is None:
+            continue
+        distance_km += float(bucket['distance_km_raw'])
+        time_ns += bucket['time_ns']
+    return distance_km * 3.6e12 / time_ns if time_ns > 0 else None
+
+
 def _non_intersection_summary(
     rows: List[Dict[str, Any]], bucket_key: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -275,6 +288,8 @@ class EngagementRepository:
                 speed_bucket_rows.extend(bucket_rows)
 
         totals = self._build_comparison_total_row(rows)
+        if totals is not None and selected_bucket != 'all':
+            totals['average_speed_kmh'] = _bucket_average_speed_kmh(entries, selected_bucket)
         bucket_label = 'All speeds'
         for bucket in options['speed_buckets']:
             if bucket['key'] == selected_bucket:
@@ -447,6 +462,7 @@ class EngagementRepository:
             'device_id': device_id,
             'branch': self._branch_distribution(rows_with_bucket_data),
             'drive_count': len(rows_with_bucket_data),
+            'average_speed_kmh': _bucket_average_speed_kmh(rows, bucket_key),
             'distance_km': round(distance_km, 2),
             'engaged_distance_km': round(engaged_distance_km, 2),
             'time_hours': round(time_hours, 2),
@@ -629,6 +645,7 @@ class EngagementRepository:
 
             speed_bucket_summary[key] = {
                 'label': bucket_cfg['label'],
+                'average_speed_kmh': _bucket_average_speed_kmh(rows, key),
                 'time_min': round(total_time_min, 2),
                 'engaged_time_min': round(engaged_time_min, 2),
                 'distance_km': round(data['distance_km'], 2),
@@ -1094,6 +1111,7 @@ class EngagementRepository:
 
             grand_total_bucket_summary[key] = {
                 'label': bucket_cfg['label'],
+                'average_speed_kmh': _bucket_average_speed_kmh(self.all_entries(), key),
                 'time_min': round(total_time_min, 2),
                 'engaged_time_min': round(engaged_time_min, 2),
                 'distance_km': round(data['distance_km'], 2),

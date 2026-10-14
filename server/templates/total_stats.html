@@ -473,6 +473,7 @@
                     <thead>
                         <tr>
                             <th>Bucket</th>
+                            <th>Average speed</th>
                             <th>Time Engagement</th>
                             <th>Distance Engagement</th>
                             <th>Total Time</th>
@@ -486,6 +487,7 @@
                         {% for key, bucket in summary.speed_bucket_summary.items() %}
                         <tr>
                             <td>{{ bucket.label }}</td>
+                            <td>{% if bucket.get('average_speed_kmh') is not none %}{{ "%.1f" | format(bucket.average_speed_kmh) }} km/h{% else %}—{% endif %}</td>
                             <td>
                                 {% if bucket.engagement_pct is not none %}
                                     {{ bucket.engagement_pct | round(1) }}%
