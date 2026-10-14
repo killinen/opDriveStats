@@ -1,0 +1,1417 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#080b12" />
+    <title>HRR Conditions / library · Engagement Gauge</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page: #080b12;
+        --panel: #10141d;
+        --raised: #171d29;
+        --line: #2b3240;
+        --text: #f5f7fb;
+        --muted: #a7b0c2;
+        --violet: #ab97ff;
+        --cyan: #70d7e2;
+        --green: #72d6a0;
+        --orange: #f2a65a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(ellipse at top left, #19172c 0, transparent 38rem),
+          var(--page);
+        color: var(--text);
+        font:
+          15px/1.5 Inter,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      main {
+        max-width: 1560px;
+        margin: auto;
+        padding: 0 28px 48px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        min-height: 72px;
+        border-bottom: 1px solid var(--line);
+      }
+      a {
+        color: var(--cyan);
+      }
+      header a {
+        text-decoration: none;
+      }
+      h1 {
+        font-size: clamp(25px, 4vw, 36px);
+        margin: 27px 0 5px;
+        letter-spacing: -0.03em;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 0 0 6px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+      .eyebrow {
+        color: var(--violet);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+      }
+      .head-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+      }
+      .badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .badge {
+        font-size: 12px;
+        padding: 5px 10px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        color: var(--muted);
+      }
+      .filters,
+      .panel,
+      .summary-card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 16px;
+      }
+      .filters {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        padding: 18px;
+        margin: 22px 0;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      select,
+      input,
+      button {
+        font: inherit;
+      }
+      select,
+      input {
+        display: block;
+        margin-top: 6px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #0d111a;
+        color: var(--text);
+      }
+      button,
+      .button {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--raised);
+        color: var(--text);
+        padding: 9px 14px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+      button:hover,
+      .button:hover {
+        border-color: var(--violet);
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.6;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      select:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--cyan);
+        outline-offset: 3px;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+        margin: 0 0 20px;
+      }
+      .summary-card {
+        padding: 16px;
+      }
+      .summary-card strong {
+        display: block;
+        font-size: 26px;
+        font-weight: 600;
+        margin: 7px 0;
+        color: var(--cyan);
+      }
+      .summary-card small {
+        color: var(--muted);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin: 20px 0;
+      }
+      .tabs button[aria-selected="true"] {
+        background: #29223f;
+        border-color: var(--violet);
+        color: #d8ccff;
+      }
+      .panel {
+        padding: 22px;
+        margin-bottom: 18px;
+      }
+      .toolbar {
+        display: flex;
+        gap: 16px;
+        align-items: end;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        margin: 16px 0;
+      }
+      .toolbar .controls {
+        display: flex;
+        gap: 14px;
+        align-items: end;
+        flex-wrap: wrap;
+      }
+      .toolbar label {
+        min-width: 130px;
+      }
+      .toolbar input {
+        width: 140px;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 11px 12px;
+        text-align: right;
+        white-space: nowrap;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        font-weight: 500;
+        color: var(--muted);
+      }
+      td:first-child,
+      th:first-child {
+        text-align: left;
+      }
+      tr.selected {
+        background: #29223f;
+      }
+      .heatmap {
+        width: auto;
+        min-width: 100%;
+      }
+      .heatmap th {
+        text-align: center;
+      }
+      .heatmap td {
+        padding: 4px;
+        border: none;
+      }
+      .heatmap button {
+        width: 100%;
+        min-width: 86px;
+        min-height: 64px;
+        border: 1px solid transparent;
+        padding: 10px 5px;
+        font-weight: 600;
+        border-radius: 7px;
+      }
+      .heatmap button small {
+        display: block;
+        font-weight: 400;
+        font-size: 11px;
+        margin-top: 4px;
+      }
+      .heatmap button:disabled {
+        background: #161b25;
+        color: var(--muted);
+        opacity: 1;
+      }
+      .heatmap button.chosen {
+        outline: 3px solid var(--text);
+        outline-offset: -3px;
+      }
+      .scale {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .gradient {
+        height: 10px;
+        width: 200px;
+        border-radius: 10px;
+        background: linear-gradient(
+          90deg,
+          #251749,
+          #234e75,
+          #208d86,
+          #69bd71,
+          #e6db65
+        );
+      }
+      #cell-detail {
+        border-left: 3px solid var(--violet);
+        padding: 10px 14px;
+        margin: 16px 0;
+        background: #191725;
+        color: var(--text);
+      }
+      .notice {
+        padding: 14px 18px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin: 16px 0;
+        color: var(--muted);
+      }
+      .error {
+        border-color: #bd6868;
+        color: #ffb4b4;
+      }
+      .chart {
+        display: block;
+        width: 100%;
+        height: auto;
+        min-height: 200px;
+        touch-action: pan-y;
+      }
+      .chart text {
+        fill: var(--muted);
+        font: 12px system-ui;
+      }
+      .legend {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        margin: 14px 0;
+      }
+      .legend span:before {
+        content: "";
+        display: inline-block;
+        width: 16px;
+        height: 3px;
+        margin-right: 7px;
+        background: var(--series);
+        vertical-align: middle;
+      }
+      .chart-readout {
+        min-height: 25px;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+      }
+      .route-picker {
+        min-width: min(450px, 100%);
+        flex: 1;
+      }
+      .empty {
+        padding: 38px 16px;
+        text-align: center;
+        color: var(--muted);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .note {
+        font-size: 12px;
+        margin-top: 18px;
+        max-width: 1100px;
+      }
+      .button-small {
+        font-size: 12px;
+        padding: 5px 10px;
+      }
+      .metric-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        align-items: center;
+      }
+      .right {
+        text-align: right;
+      }
+      .storage-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      @media (max-width: 1050px) {
+        .summary {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .filters {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 600px) {
+        main {
+          padding: 0 14px 30px;
+        }
+        .head-row {
+          display: block;
+        }
+        .badges {
+          margin-top: 12px;
+        }
+        .summary {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .summary-card strong {
+          font-size: 23px;
+        }
+        .filters {
+          padding: 14px;
+          gap: 12px;
+        }
+        .panel {
+          padding: 16px;
+        }
+        .toolbar .controls {
+          width: 100%;
+        }
+        .toolbar label {
+          flex: 1;
+          min-width: 110px;
+        }
+        .toolbar input {
+          width: 100%;
+        }
+        .tabs {
+          overflow-x: auto;
+        }
+        .tabs button {
+          white-space: nowrap;
+        }
+        .storage-note {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a href="/">← Engagement Gauge</a
+        ><span class="storage-note">HRR temperature library</span>
+      </header>
+      <div class="head-row">
+        <div>
+          <h1>Conditions / library</h1>
+          <p>
+            Explore HRR heat across ambient temperatures, speeds, and drive
+            phases.
+          </p>
+        </div>
+        <div class="badges">
+          <span class="badge">Ambient provisional</span
+          ><span class="badge">Engine tentative</span>
+        </div>
+      </div>
+      <div id="status" class="notice" role="status" aria-live="polite">
+        Loading temperature library…
+      </div>
+      <section class="filters" aria-label="Library filters">
+        <label
+          >Decoder<select id="profile">
+            <option value="">Latest available</option>
+          </select></label
+        >
+        <label
+          >Device<select id="device">
+            <option value="">All devices</option>
+          </select></label
+        >
+        <label
+          >Engine temperature<select id="engine">
+            <option>All</option>
+            <option>Below 50 °C</option>
+            <option>50–80 °C</option>
+            <option>80+ °C</option>
+          </select></label
+        >
+        <label
+          >Drive phase<select id="phase">
+            <option>All</option>
+            <option>First 5 min</option>
+            <option>5–15 min</option>
+            <option>15+ min</option>
+            <option>Unknown route start</option>
+          </select></label
+        >
+      </section>
+      <section
+        id="summary"
+        class="summary"
+        aria-label="Temperature summary"
+      ></section>
+      <div class="tabs" role="tablist" aria-label="Temperature views">
+        <button
+          type="button"
+          role="tab"
+          id="tab-conditions"
+          aria-selected="true"
+          aria-controls="conditions"
+        >
+          Conditions
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="tab-coverage"
+          aria-selected="false"
+          aria-controls="coverage"
+        >
+          Coverage
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="tab-drives"
+          aria-selected="false"
+          aria-controls="drives"
+        >
+          Drive plots
+        </button>
+      </div>
+      <section id="conditions" role="tabpanel" aria-labelledby="tab-conditions">
+        <div class="panel">
+          <div class="metric-heading">
+            <div>
+              <span class="eyebrow">Operating temperature</span>
+              <h2>Ambient × speed</h2>
+            </div>
+            <a
+              id="export-conditions"
+              class="button"
+              href="/api/temperatures/conditions.csv"
+              >Export conditions CSV</a
+            >
+          </div>
+          <p>
+            Click a condition to inspect its temperature range and evidence.
+          </p>
+          <div class="toolbar">
+            <div class="controls">
+              <label
+                >Heatmap metric<select id="metric">
+                  <option value="p95">HRR 95th percentile</option>
+                  <option value="median">HRR median</option>
+                  <option value="max">HRR maximum (1-second grid)</option>
+                  <option value="delta_p95">HRR − ambient P95</option>
+                </select></label
+              ><label
+                >Minimum seconds<input
+                  id="min-seconds"
+                  type="number"
+                  min="1"
+                  max="360000"
+                  value="60" /></label
+              ><label
+                >Minimum drives<input
+                  id="min-drives"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value="1"
+              /></label>
+            </div>
+            <button id="refresh" type="button">Refresh library</button>
+          </div>
+          <div id="heatmap" class="scroll"></div>
+          <div id="scale" class="scale" hidden>
+            <span id="scale-low"></span><span class="gradient"></span
+            ><span id="scale-high"></span><span>°C</span>
+          </div>
+          <div id="cell-detail" hidden></div>
+          <p class="note">
+            Statistics give each valid second equal weight. HRR expires after
+            1.5 seconds; speed after 2 seconds, ambient after 60 seconds, and
+            engine after 5 seconds. Invalid readings and missing log intervals
+            remain gaps. A 30-second mean requires 30 consecutive valid seconds
+            in the same conditions.
+          </p>
+        </div>
+        <div class="panel">
+          <h2>Condition ranges</h2>
+          <p>
+            Full condition statistics before the heatmap’s minimum-coverage
+            thresholds.
+          </p>
+          <div id="ranges" class="scroll"></div>
+        </div>
+      </section>
+      <section
+        id="coverage"
+        role="tabpanel"
+        aria-labelledby="tab-coverage"
+        hidden
+      >
+        <div class="panel">
+          <h2>Segment coverage</h2>
+          <p id="coverage-summary"></p>
+          <div id="coverage-table" class="scroll"></div>
+          <p class="note">
+            Segments with no HRR frames still contribute observed CAN time.
+            Legacy v1 coverage is estimated from report intervals. Previously
+            uploaded segments remain in the library after device log cleanup.
+          </p>
+        </div>
+      </section>
+      <section id="drives" role="tabpanel" aria-labelledby="tab-drives" hidden>
+        <div class="panel">
+          <h2>Drive detail</h2>
+          <p>
+            Original HRR reports and comparison streams. Choose a window to
+            inspect a brief peak.
+          </p>
+          <div class="toolbar">
+            <label class="route-picker"
+              >Drive<select id="drive-select">
+                <option value="">Select a drive</option>
+              </select></label
+            ><a id="export-samples" class="button" hidden>Export samples CSV</a>
+          </div>
+          <div class="toolbar">
+            <div class="controls">
+              <label
+                >From minute<input
+                  id="plot-start"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value="0" /></label
+              ><label
+                >To minute<input
+                  id="plot-end"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value="1"
+              /></label>
+            </div>
+            <div>
+              <button id="plot-apply" type="button">Apply window</button>
+              <button id="plot-reset" type="button">Full drive</button>
+            </div>
+          </div>
+          <div id="drive-description" class="notice">
+            Select a drive from the library.
+          </div>
+          <div class="legend">
+            <span style="--series: var(--cyan)">HRR</span
+            ><span style="--series: var(--green)">Ambient (provisional)</span
+            ><span style="--series: var(--orange)">Engine (tentative)</span>
+          </div>
+          <svg
+            id="temperature-chart"
+            class="chart"
+            viewBox="0 0 1100 290"
+            role="img"
+            aria-label="HRR, ambient and engine temperature over drive time"
+          ></svg>
+          <div class="legend">
+            <span style="--series: var(--violet)">Vehicle speed · km/h</span>
+          </div>
+          <svg
+            id="speed-chart"
+            class="chart"
+            viewBox="0 0 1100 230"
+            role="img"
+            aria-label="Vehicle speed over drive time"
+          ></svg>
+          <div id="chart-readout" class="chart-readout" aria-live="polite">
+            Move over a plot to inspect the nearest reports.
+          </div>
+          <p class="note">
+            Dense plots retain minimum and maximum points for display. All
+            collected reports remain stored and available through samples CSV.
+          </p>
+        </div>
+        <div class="panel">
+          <h2>Recorded drives</h2>
+          <div id="drive-table" class="scroll"></div>
+        </div>
+      </section>
+    </main>
+    <script>
+      "use strict";
+      const $ = (id) => document.getElementById(id);
+      const node = (tag, text, attrs = {}) => {
+        const e = document.createElement(tag);
+        if (text !== null && text !== undefined) e.textContent = text;
+        for (const [k, v] of Object.entries(attrs))
+          e.setAttribute(k, String(v));
+        return e;
+      };
+      const fmt = (v, d = 1) =>
+        v === null || v === undefined
+          ? "—"
+          : Number(v).toLocaleString(undefined, {
+              maximumFractionDigits: d,
+              minimumFractionDigits: d,
+            });
+      const hours = (s) => fmt(s / 3600, 2);
+      let report = null,
+        currentDrive = null,
+        chosenCell = null,
+        requestNumber = 0,
+        driveRequest = 0;
+      function params() {
+        const p = new URLSearchParams();
+        for (const key of ["profile", "device", "engine", "phase"])
+          if ($(key).value) p.set(key, $(key).value);
+        return p;
+      }
+      function setOptions(id, values, label, details = []) {
+        const select = $(id),
+          previous = select.value;
+        select.replaceChildren(node("option", label, { value: "" }));
+        for (const value of values)
+          select.append(
+            node(
+              "option",
+              id === "profile"
+                ? details.find((item) => item.id === value)?.label ||
+                    `Profile ${value}`
+                : value,
+              { value },
+            ),
+          );
+        if (values.map(String).includes(previous)) select.value = previous;
+      }
+      async function load() {
+        const number = ++requestNumber;
+        $("refresh").disabled = true;
+        try {
+          const response = await fetch("/api/temperatures?" + params());
+          if (!response.ok)
+            throw Error(`Library request failed (${response.status}).`);
+          const data = await response.json();
+          if (number !== requestNumber) return;
+          const previousProfile = $("profile").value;
+          const previousDevice = $("device").value;
+          setOptions(
+            "profile",
+            data.profiles,
+            "Latest available",
+            data.profile_details,
+          );
+          setOptions("device", data.devices, "All devices");
+          if (
+            previousProfile !== $("profile").value ||
+            previousDevice !== $("device").value
+          ) {
+            load();
+            return;
+          }
+          report = data;
+          chosenCell = null;
+          ++driveRequest;
+          render();
+        } catch (error) {
+          if (number === requestNumber) {
+            $("status").textContent = error.message;
+            $("status").className = "notice error";
+          }
+        } finally {
+          if (number === requestNumber) $("refresh").disabled = false;
+        }
+      }
+      function render() {
+        const data = report;
+        const lastUpdate = [
+          data.sync.last_sync_at,
+          data.desktop_import?.last_sync_at,
+        ]
+          .filter(Boolean)
+          .sort()
+          .at(-1);
+        const updated = lastUpdate
+          ? new Date(lastUpdate).toLocaleString()
+          : "awaiting first sync";
+        $("status").className = "notice";
+        $("status").textContent = data.drives.length
+          ? `${data.drives.length} drive(s) · ${hours(data.available_seconds)} h fresh HRR / ${hours(data.observed_seconds)} h observed · Updated ${updated}${data.pending_snapshots ? ` · ${data.pending_snapshots} snapshot(s) still downloading` : ""}`
+          : "No temperature drives yet. Telemetry will appear after the next device upload and sync.";
+        if (data.sync.last_error) {
+          $("status").className = "notice error";
+          $("status").textContent +=
+            " · Latest sync failed; saved data remains available.";
+        }
+        $("summary").replaceChildren();
+        const cards = [
+          [
+            "Median HRR",
+            fmt(data.summary.median) + " °C",
+            `${fmt(data.summary.drives, 0)} filtered drives`,
+          ],
+          [
+            "95th percentile",
+            fmt(data.summary.p95) + " °C",
+            `${hours(data.summary.seconds)} h filtered coverage`,
+          ],
+          [
+            "Raw HRR peak",
+            fmt(data.raw_max) + " °C",
+            "Across this device / decoder selection",
+          ],
+          [
+            "30-second peak",
+            fmt(data.summary.sustained) + " °C",
+            "Complete consecutive valid seconds",
+          ],
+          [
+            "HRR above ambient",
+            fmt(data.summary.delta_p95) + " °C",
+            "95th percentile · ambient provisional",
+          ],
+        ];
+        for (const [label, value, note] of cards) {
+          const e = node("div", null, { class: "summary-card" });
+          e.append(
+            node("span", label, { class: "muted" }),
+            node("strong", value),
+            node("small", note),
+          );
+          $("summary").append(e);
+        }
+        $("export-conditions").href =
+          "/api/temperatures/conditions.csv?" + params();
+        drawHeatmap();
+        drawRanges();
+        drawCoverage();
+        drawDrives();
+      }
+      function color(value, lo, hi) {
+        const anchors = [
+          [37, 23, 73],
+          [35, 78, 117],
+          [32, 141, 134],
+          [105, 189, 113],
+          [230, 219, 101],
+        ];
+        const t = Math.max(0, Math.min(1, (value - lo) / (hi - lo || 1))) * 4;
+        const index = Math.min(3, Math.floor(t)),
+          f = t - index;
+        const rgb = anchors[index].map((v, i) =>
+          Math.round(v + (anchors[index + 1][i] - v) * f),
+        );
+        return {
+          background: `rgb(${rgb.join(",")})`,
+          foreground:
+            rgb[0] * 0.21 + rgb[1] * 0.72 + rgb[2] * 0.07 > 130
+              ? "#080b12"
+              : "#ffffff",
+        };
+      }
+      function drawHeatmap() {
+        if (!report) return;
+        const target = $("heatmap");
+        target.replaceChildren();
+        $("cell-detail").hidden = true;
+        chosenCell = null;
+        if (!report.cells.length) {
+          target.append(
+            node(
+              "div",
+              "No fresh HRR, ambient and speed observations match these filters.",
+              { class: "empty" },
+            ),
+          );
+          $("scale").hidden = true;
+          return;
+        }
+        const metric = $("metric").value,
+          minSeconds = Math.max(1, Number($("min-seconds").value) || 1),
+          minDrives = Math.max(1, Number($("min-drives").value) || 1),
+          visible = report.cells.filter(
+            (c) =>
+              c.seconds >= minSeconds &&
+              c.drives >= minDrives &&
+              c[metric] !== null,
+          );
+        const values = visible.map((c) => c[metric]);
+        const lo = values.length ? Math.min(...values) : 0,
+          hi = values.length ? Math.max(...values) : 1;
+        $("scale").hidden = !values.length;
+        $("scale-low").textContent = fmt(lo);
+        $("scale-high").textContent = fmt(hi);
+        const bands = [...new Set(report.cells.map((c) => c.ambient_low))].sort(
+            (a, b) => a - b,
+          ),
+          cells = new Map(
+            report.cells.map((c) => [`${c.ambient_low}:${c.speed_band}`, c]),
+          );
+        const table = node("table", null, { class: "heatmap" }),
+          head = node("tr");
+        head.append(node("th", "Speed / ambient °C"));
+        for (const ambient of bands)
+          head.append(node("th", `${ambient} to ${ambient + 5}`));
+        const thead = node("thead");
+        thead.append(head);
+        table.append(thead);
+        const body = node("tbody");
+        for (let speed = 4; speed >= 0; speed--) {
+          const tr = node("tr");
+          tr.append(node("th", report.speed_bands[speed] + " km/h"));
+          for (const ambient of bands) {
+            const td = node("td"),
+              cell = cells.get(`${ambient}:${speed}`),
+              eligible =
+                cell &&
+                cell.seconds >= minSeconds &&
+                cell.drives >= minDrives &&
+                cell[metric] !== null;
+            const button = node("button", eligible ? fmt(cell[metric]) : "—", {
+              type: "button",
+              "aria-label": `${ambient} to ${ambient + 5} °C, ${report.speed_bands[speed]} km/h: ${eligible ? fmt(cell[metric]) + " °C" : "insufficient coverage"}`,
+            });
+            if (eligible) {
+              const c = color(cell[metric], lo, hi);
+              button.style.background = c.background;
+              button.style.color = c.foreground;
+              button.append(
+                node(
+                  "small",
+                  `${hours(cell.seconds)} h · ${cell.drives} drives`,
+                ),
+              );
+              button.addEventListener("click", () => inspectCell(cell, button));
+            } else button.disabled = true;
+            td.append(button);
+            tr.append(td);
+          }
+          body.append(tr);
+        }
+        table.append(body);
+        target.append(table);
+      }
+      function inspectCell(cell, button) {
+        document
+          .querySelectorAll(".heatmap .chosen")
+          .forEach((e) => e.classList.remove("chosen"));
+        button.classList.add("chosen");
+        chosenCell = `${cell.ambient_low}:${cell.speed_band}`;
+        $("cell-detail").hidden = false;
+        $("cell-detail").textContent =
+          `Ambient ${cell.ambient_low}–${cell.ambient_low + 5} °C · Speed ${report.speed_bands[cell.speed_band]} km/h · ${hours(cell.seconds)} h / ${cell.drives} drives · Min ${fmt(cell.min)} °C · Median ${fmt(cell.median)} °C · P95 ${fmt(cell.p95)} °C · Max ${fmt(cell.max)} °C · 30s peak ${fmt(cell.sustained)} °C · Δ P95 ${fmt(cell.delta_p95)} °C`;
+        document
+          .querySelectorAll("#ranges tr[data-cell]")
+          .forEach((e) =>
+            e.classList.toggle("selected", e.dataset.cell === chosenCell),
+          );
+      }
+      function tableFor(target, headers, rows) {
+        target.replaceChildren();
+        if (!rows.length) {
+          target.append(
+            node("div", "No matching observations yet.", { class: "empty" }),
+          );
+          return;
+        }
+        const table = node("table"),
+          head = node("tr");
+        for (const h of headers) head.append(node("th", h));
+        const thead = node("thead");
+        thead.append(head);
+        table.append(thead);
+        const body = node("tbody");
+        for (const row of rows) body.append(row);
+        table.append(body);
+        target.append(table);
+      }
+      function trFor(values) {
+        const tr = node("tr");
+        for (const value of values) {
+          const td = node("td");
+          if (value instanceof Node) td.append(value);
+          else td.textContent = value;
+          tr.append(td);
+        }
+        return tr;
+      }
+      function drawRanges() {
+        const rows = report.cells.map((c) => {
+          const tr = trFor([
+            `${c.ambient_low}–${c.ambient_low + 5}`,
+            report.speed_bands[c.speed_band],
+            hours(c.seconds),
+            fmt(c.drives, 0),
+            fmt(c.min),
+            fmt(c.median),
+            fmt(c.p95),
+            fmt(c.max),
+            fmt(c.sustained),
+            fmt(c.delta_median),
+            fmt(c.delta_p95),
+          ]);
+          tr.dataset.cell = `${c.ambient_low}:${c.speed_band}`;
+          return tr;
+        });
+        tableFor(
+          $("ranges"),
+          [
+            "Ambient °C",
+            "Speed km/h",
+            "Hours",
+            "Drives",
+            "Min °C",
+            "Median °C",
+            "P95 °C",
+            "Max (1s) °C",
+            "30s peak °C",
+            "Δ median °C",
+            "Δ P95 °C",
+          ],
+          rows,
+        );
+      }
+      function drawCoverage() {
+        $("coverage-summary").textContent =
+          `${report.segments.length} segments · ${hours(report.observed_seconds)} h observed · ${hours(report.available_seconds)} h fresh HRR · ${report.observed_seconds ? fmt((report.available_seconds / report.observed_seconds) * 100) : "—"}% coverage`;
+        const rows = report.segments.map((s) => {
+          const state = s.hrr_valid
+            ? "Valid"
+            : s.hrr_invalid
+              ? "Invalid"
+              : s.hrr_malformed
+                ? "Undecodable"
+                : "Missing HRR";
+          return trFor([
+            s.device,
+            s.drive,
+            s.source_segment_index === null ? "Unknown" : s.segment,
+            s.source_kind === "desktop_library"
+              ? "Desktop library"
+              : "Telemetry",
+            state,
+            s.estimated ? "Estimated" : hours(s.available_seconds),
+            hours(s.observed_seconds),
+            s.hrr_frames ?? "—",
+            s.hrr_valid,
+            s.hrr_invalid,
+            s.hrr_malformed,
+            s.recorded_at
+              ? new Date(s.recorded_at).toLocaleString()
+              : "Unknown",
+          ]);
+        });
+        tableFor(
+          $("coverage-table"),
+          [
+            "Device",
+            "Route",
+            "Segment",
+            "Source",
+            "Status",
+            "Fresh HRR h",
+            "Observed h",
+            "Received",
+            "Valid",
+            "Invalid",
+            "Undecodable",
+            "UTC reference",
+          ],
+          rows,
+        );
+      }
+      function switchTab(name) {
+        for (const value of ["conditions", "coverage", "drives"]) {
+          $(value).hidden = value !== name;
+          $("tab-" + value).setAttribute(
+            "aria-selected",
+            String(value === name),
+          );
+        }
+      }
+      function drawDrives() {
+        const select = $("drive-select");
+        select.replaceChildren(node("option", "Select a drive", { value: "" }));
+        const rows = [];
+        report.drives.forEach((drive, index) => {
+          select.append(
+            node(
+              "option",
+              `${drive.device} · ${drive.recorded_at ? new Date(drive.recorded_at).toLocaleString() : drive.drive} · ${drive.drive}`,
+              { value: String(index) },
+            ),
+          );
+          const button = node("button", "Open plot", {
+            class: "button-small",
+            type: "button",
+          });
+          button.addEventListener("click", () => {
+            select.value = String(index);
+            switchTab("drives");
+            loadDrive();
+          });
+          rows.push(
+            trFor([
+              drive.device,
+              drive.drive,
+              drive.segments,
+              hours(drive.available_seconds),
+              fmt(drive.raw_max),
+              drive.git_branch || "—",
+              button,
+            ]),
+          );
+        });
+        tableFor(
+          $("drive-table"),
+          [
+            "Device",
+            "Route",
+            "Segments",
+            "Fresh HRR h",
+            "Raw peak °C",
+            "Branch",
+            "",
+          ],
+          rows,
+        );
+        if (currentDrive) {
+          const index = report.drives.findIndex(
+            (d) =>
+              d.device === currentDrive.device &&
+              d.drive === currentDrive.drive,
+          );
+          if (index >= 0 && currentDrive.profile === report.profile) {
+            select.value = String(index);
+            if (currentDrive.revision !== report.drives[index].revision)
+              loadDrive();
+            return;
+          }
+        }
+        currentDrive = null;
+        $("export-samples").hidden = true;
+        $("temperature-chart").replaceChildren();
+        $("speed-chart").replaceChildren();
+        $("drive-description").textContent = "Select a drive from the library.";
+      }
+      async function loadDrive() {
+        const number = ++driveRequest,
+          value = $("drive-select").value;
+        if (value === "") return;
+        const drive = report.drives[Number(value)],
+          query = new URLSearchParams({
+            device: drive.device,
+            drive: drive.drive,
+            profile: report.profile,
+          });
+        $("drive-description").textContent = "Loading original reports…";
+        try {
+          const response = await fetch("/api/temperatures/drive?" + query);
+          if (!response.ok)
+            throw Error(`Drive request failed (${response.status}).`);
+          const data = await response.json();
+          if (number !== driveRequest) return;
+          currentDrive = data;
+          $("export-samples").href = "/api/temperatures/samples.csv?" + query;
+          $("export-samples").hidden = false;
+          $("drive-description").textContent =
+            `${data.device} / ${data.drive} · ${data.coverage.length} segments · ${data.samples.filter((s) => s.metric === "hrr").length} HRR reports · ${data.metadata.source_kind === "desktop_library" ? "Desktop library history" : data.metadata.git_branch || "Unknown branch"}${data.profile === 1 ? " · Legacy comparison snapshots; coverage estimated" : ""}`;
+          resetWindow();
+        } catch (error) {
+          if (number === driveRequest)
+            $("drive-description").textContent = error.message;
+        }
+      }
+      function resetWindow() {
+        if (!currentDrive) return;
+        $("plot-start").value = 0;
+        $("plot-end").value = Math.max(
+          0.1,
+          Math.ceil(
+            (currentDrive.samples.reduce(
+              (maximum, s) => Math.max(maximum, s.time_s),
+              0,
+            ) /
+              60) *
+              10,
+          ) / 10,
+        );
+        drawPlots();
+      }
+      const svgNode = (tag, attrs = {}, text) => {
+        const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+        for (const [k, v] of Object.entries(attrs))
+          e.setAttribute(k, String(v));
+        if (text !== undefined) e.textContent = text;
+        return e;
+      };
+      function slim(points) {
+        if (points.length <= 2000) return points;
+        const out = [];
+        const size = Math.ceil(points.length / 500);
+        for (let i = 0; i < points.length; i += size) {
+          const chunk = points.slice(i, i + size);
+          let low = chunk[0],
+            high = chunk[0];
+          for (const row of chunk) {
+            if (row.value < low.value) low = row;
+            if (row.value > high.value) high = row;
+          }
+          out.push(
+            ...[chunk[0], low, high, chunk[chunk.length - 1]].sort(
+              (a, b) => a.time_s - b.time_s,
+            ),
+          );
+        }
+        return out;
+      }
+      function drawPlots() {
+        if (!currentDrive) return;
+        const start = Number($("plot-start").value) * 60,
+          end = Number($("plot-end").value) * 60;
+        if (
+          !Number.isFinite(start) ||
+          !Number.isFinite(end) ||
+          start < 0 ||
+          end <= start
+        ) {
+          $("chart-readout").textContent =
+            "Choose a valid window with its end after its start.";
+          return;
+        }
+        chart(
+          "temperature-chart",
+          ["hrr", "ambient", "engine"],
+          start,
+          end,
+          "°C",
+        );
+        chart("speed-chart", ["speed"], start, end, "km/h");
+      }
+      function chart(id, metrics, start, end, unit) {
+        const svg = $(id);
+        svg.replaceChildren();
+        const width = 1100,
+          height = id === "speed-chart" ? 230 : 290,
+          left = 62,
+          right = 20,
+          top = 20,
+          bottom = 42;
+        const visible = currentDrive.samples.filter(
+          (s) =>
+            s.time_s >= start && s.time_s <= end && metrics.includes(s.metric),
+        );
+        const finite = visible
+          .filter((s) => s.value !== null)
+          .map((s) => s.value);
+        let lo = finite.length
+            ? finite.reduce((minimum, v) => Math.min(minimum, v), Infinity)
+            : 0,
+          hi = finite.length
+            ? finite.reduce((maximum, v) => Math.max(maximum, v), -Infinity)
+            : 1;
+        const pad = Math.max(2, (hi - lo) * 0.1);
+        lo -= pad;
+        hi += pad;
+        const x = (t) =>
+            left + ((t - start) / (end - start)) * (width - left - right),
+          y = (v) =>
+            height - bottom - ((v - lo) / (hi - lo)) * (height - top - bottom);
+        for (let i = 0; i <= 4; i++) {
+          const value = lo + ((hi - lo) * i) / 4,
+            yy = y(value);
+          svg.append(
+            svgNode("line", {
+              x1: left,
+              x2: width - right,
+              y1: yy,
+              y2: yy,
+              stroke: "#2b3240",
+            }),
+            svgNode(
+              "text",
+              { x: left - 10, y: yy + 4, "text-anchor": "end" },
+              fmt(value),
+            ),
+          );
+          const t = start + ((end - start) * i) / 4,
+            xx = x(t);
+          svg.append(
+            svgNode(
+              "text",
+              { x: xx, y: height - 18, "text-anchor": "middle" },
+              fmt(t / 60),
+            ),
+          );
+        }
+        svg.append(
+          svgNode("text", { x: left, y: 12 }, unit),
+          svgNode(
+            "text",
+            { x: width - right, y: height - 2, "text-anchor": "end" },
+            "Elapsed minutes",
+          ),
+        );
+        const colors = {
+            hrr: "#70d7e2",
+            ambient: "#72d6a0",
+            engine: "#f2a65a",
+            speed: "#ab97ff",
+          },
+          ages = { hrr: 1.5, ambient: 60, engine: 5, speed: 2 };
+        for (const metric of metrics) {
+          let group = [],
+            previous = null;
+          const flush = () => {
+            if (!group.length) return;
+            const points = slim(group);
+            const d = points
+              .map(
+                (p, i) =>
+                  `${i ? "L" : "M"}${x(p.time_s).toFixed(2)},${y(p.value).toFixed(2)}`,
+              )
+              .join(" ");
+            svg.append(
+              svgNode("path", {
+                d,
+                fill: "none",
+                stroke: colors[metric],
+                "stroke-width": 2,
+              }),
+            );
+            if (points.length === 1)
+              svg.append(
+                svgNode("circle", {
+                  cx: x(points[0].time_s),
+                  cy: y(points[0].value),
+                  r: 2.5,
+                  fill: colors[metric],
+                }),
+              );
+            group = [];
+          };
+          for (const row of visible.filter((s) => s.metric === metric)) {
+            if (
+              row.value === null ||
+              (previous &&
+                (row.time_s - previous.time_s > ages[metric] ||
+                  row.segment - previous.segment > 1))
+            ) {
+              flush();
+            }
+            if (row.value !== null) group.push(row);
+            previous = row;
+          }
+          flush();
+        }
+        if (!finite.length)
+          svg.append(
+            svgNode(
+              "text",
+              { x: width / 2, y: height / 2, "text-anchor": "middle" },
+              "No observations in this window",
+            ),
+          );
+        const cursor = svgNode("line", {
+          x1: left,
+          x2: left,
+          y1: top,
+          y2: height - bottom,
+          stroke: "#b9c0cc",
+          "stroke-dasharray": "4 4",
+          visibility: "hidden",
+        });
+        svg.append(cursor);
+        svg.onpointermove = (event) => {
+          const box = svg.getBoundingClientRect(),
+            xx = ((event.clientX - box.left) / box.width) * width;
+          if (xx < left || xx > width - right) return;
+          const t =
+            start + ((xx - left) / (width - left - right)) * (end - start);
+          cursor.setAttribute("x1", xx);
+          cursor.setAttribute("x2", xx);
+          cursor.setAttribute("visibility", "visible");
+          const parts = [`${fmt(t / 60, 2)} min`];
+          for (const metric of metrics) {
+            let nearest = null;
+            for (const row of visible)
+              if (
+                row.metric === metric &&
+                (!nearest ||
+                  Math.abs(row.time_s - t) < Math.abs(nearest.time_s - t))
+              )
+                nearest = row;
+            if (nearest)
+              parts.push(
+                `${metric.toUpperCase()} ${fmt(nearest.value)} ${metric === "speed" ? "km/h" : "°C"} at ${fmt(nearest.time_s / 60, 2)} min`,
+              );
+          }
+          $("chart-readout").textContent = parts.join(" · ");
+        };
+        svg.onpointerleave = () => cursor.setAttribute("visibility", "hidden");
+      }
+      for (const key of ["profile", "device", "engine", "phase"])
+        $(key).addEventListener("change", load);
+      for (const key of ["metric", "min-seconds", "min-drives"])
+        $(key).addEventListener("change", drawHeatmap);
+      for (const tab of ["conditions", "coverage", "drives"])
+        $("tab-" + tab).addEventListener("click", () => switchTab(tab));
+      const tabButtons = [...document.querySelectorAll('[role="tab"]')];
+      tabButtons.forEach((button, index) =>
+        button.addEventListener("keydown", (event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
+            return;
+          event.preventDefault();
+          const next =
+            event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? 2
+                : (index + (event.key === "ArrowRight" ? 1 : 2)) % 3;
+          tabButtons[next].click();
+          tabButtons[next].focus();
+        }),
+      );
+      $("refresh").addEventListener("click", load);
+      $("drive-select").addEventListener("change", loadDrive);
+      $("plot-apply").addEventListener("click", drawPlots);
+      $("plot-reset").addEventListener("click", resetWindow);
+      load();
+      setInterval(load, 60000);
+    </script>
+  </body>
+</html>

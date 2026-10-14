@@ -10,23 +10,26 @@ from fastapi.templating import Jinja2Templates
 from .data import repository
 from .drive_stats_sync import DriveStatsSyncConfig, DriveStatsSynchronizer
 from .web_auth import install_auth, csrf_token
+from .temperature_sync import TemperatureSyncConfig, TemperatureSynchronizer
+from .temperature_routes import router as temperature_router
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     config = DriveStatsSyncConfig.from_environment()
-    task = None
+    tasks = []
     if config is not None:
-        task = asyncio.create_task(DriveStatsSynchronizer(config).run_forever())
+        tasks.append(asyncio.create_task(DriveStatsSynchronizer(config).run_forever()))
+    temperature_config = TemperatureSyncConfig.from_environment(config)
+    if temperature_config is not None:
+        tasks.append(asyncio.create_task(TemperatureSynchronizer(temperature_config).run_forever()))
     try:
         yield
     finally:
-        if task is not None:
+        for task in tasks:
             task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 app = FastAPI(
@@ -38,6 +41,7 @@ app = FastAPI(
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / 'templates'))
 install_auth(app, templates)
+app.include_router(temperature_router)
 
 
 @app.get('/', summary='Engagement Gauge home', response_class=HTMLResponse)

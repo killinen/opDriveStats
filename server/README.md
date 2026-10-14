@@ -219,3 +219,113 @@ After these steps your API is reachable at `https://<subdomain>.duckdns.org`, wi
 
 - Keep private access enabled when exposing the site publicly.
 - Use HTTPS via the reverse proxy for Google callbacks and Secure session cookies.
+
+
+## HRR Conditions / library
+
+Open **HRR Conditions / library** from the home page, or visit `/temperatures`.
+The page uses the same Google/guest access gate as the engagement dashboards.
+It provides ambient × speed heatmaps (median, P95, sampled max and HRR-above-ambient
+P95), coverage thresholds, detailed condition tables, decoder/device/engine/drive
+phase filters, a per-segment coverage inventory, and drive plots with selectable
+time windows, hover values and complete samples CSV downloads. Ambient decoding
+is provisional; engine decoding is tentative, matching `hrr-temp-tracker`.
+
+The Conditions statistics use the desktop library's one-second absolute-time
+grid, preceding-only alignment, and freshness limits: HRR 1.5 seconds, speed 2,
+ambient 60 and engine 5. Missing/invalid observations remain gaps. A sustained
+30-second mean requires 30 consecutive valid seconds in the same conditions and
+drive. A missing segment 0 produces an unknown route-start phase. Raw HRR peaks
+remain available even when filters exclude their operating conditions.
+
+### Synchronization and compression
+
+If engagement synchronization already uses a source ending in
+`/drive-stats/export`, the temperature synchronizer automatically derives
+`/drive-telemetry/export` and reuses its scoped token. Deploy the GoranConnect
+telemetry endpoint update first. To configure it explicitly:
+
+```bash
+export DRIVE_TELEMETRY_SOURCE_URL='https://goranconnect.duckdns.org/api/drive-telemetry/export'
+# Reuses .drive_stats_source_token, or DRIVE_STATS_SOURCE_TOKEN_FILE.
+export TEMPERATURE_DB_PATH='/home/oracle/data/temperature.sqlite3'
+uvicorn server.app:app --host 127.0.0.1 --port 8000
+```
+
+Optional overrides:
+
+- `DRIVE_TELEMETRY_SOURCE_TOKEN` or `DRIVE_TELEMETRY_SOURCE_TOKEN_FILE`
+- `DRIVE_TELEMETRY_POLL_INTERVAL` (60 seconds)
+- `DRIVE_TELEMETRY_PAGE_SIZE` (10, maximum 100)
+- `DRIVE_TELEMETRY_SOURCE_TIMEOUT` (30 seconds)
+- `DRIVE_TELEMETRY_LOCK_PATH` (defaults to `.temperature_sync.lock`)
+- `DRIVE_TELEMETRY_SYNC=0` disables the puller without disabling saved views.
+
+The default `temperature.sqlite3` database is in the project root and ignored by
+Git. Raw batches, canonical segment samples and derived grids are stored as gzip
+blobs; searchable metadata stays outside the blobs. Compression does not round,
+quantize or discard collected values. The frontend only reduces densely plotted
+points for display, retaining extrema; full CSV exports preserve all samples.
+
+Cursor updates and imported data commit in one SQLite transaction. Incomplete
+snapshots remain hidden until all batches arrive. A newer complete revision
+updates its covered segments while retaining previously uploaded segments that
+loggerd has deleted, so cleanup on the device does not erase the website library.
+Original revisions remain stored. Decoder schemas stay separate: v2 has exact
+coverage and engine data; v1 remains supported with estimated report coverage.
+Cached summaries keep repeated dashboard requests fast. Keep the SQLite database
+in backups (including WAL when backing up a running service); credentials use
+the existing ignored token file and are never exposed to the browser.
+
+Protected endpoints:
+
+- `/api/temperatures` — condition summary, heatmap cells, drives and coverage
+- `/api/temperatures/drive?device=...&drive=...&profile=2` — original plot streams
+- `/api/temperatures/conditions.csv` — all condition statistics with active filters
+- `/api/temperatures/samples.csv?device=...&drive=...&profile=2` — full collected samples,
+  including original integer nanosecond timestamps, ambient bytes and HRR counters
+
+Check the temperature implementation and existing access control with:
+
+```bash
+.venv/bin/python -m unittest server.test_temperatures server.test_web_auth server.test_drive_stats_sync
+```
+
+Deployment order is GoranConnect, device collector, then opDriveStats. Existing
+engagement records remain in their existing JSON database and synchronization.
+
+### Import desktop library history
+
+Stop or finish the desktop tracker's current import, then run from the opDriveStats
+checkout (no raw rlogs or openpilot dependencies are needed):
+
+```bash
+.venv/bin/python -m server.temperature_import \
+  ~/OPstuff/op_github_dev/hrr-temp-tracker/output/library.sqlite
+# Use --database /path/temperature.sqlite3 for a custom server database.
+```
+
+For another machine, copy a consistent SQLite snapshot of the library, then run
+the same command there. The importer snapshots the source including its committed
+WAL, checks integrity and leaves the source untouched. If the desktop library
+changes while copying, it stops and asks you to retry. Optional `--profile HASH`
+and `--device ID` select part of a library.
+
+Imports are transactional and repeatable: unchanged segments are skipped. Every
+original sample, integer timestamp, CAN bus, decoder configuration and segment
+metadata is retained in compressed archives. The current LS600h decoder maps to
+Conditions v2; other configurations get separately selectable desktop profiles.
+Route IDs are normalized to match telemetry. Live telemetry takes precedence for
+an overlapping segment; historical imports fill missing segments. No remote
+export cursor is consumed, and the running website notices imported revisions on
+its next refresh without a restart.
+
+Coverage identifies desktop segments explicitly. The library does not retain
+received-frame/repeated-counter counts, ambient raw bytes or HRR counters; those
+fields stay unknown. Original GPS UTC references are retained without claiming
+an exact CAN-to-UTC anchor. Missing segment indices keep route-start phase unknown.
+Use SQLite's backup API to back up a running destination before importing.
+
+```bash
+.venv/bin/python -m unittest server.test_temperature_import server.test_temperatures
+```
