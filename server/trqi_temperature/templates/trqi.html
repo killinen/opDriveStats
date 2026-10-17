@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TRQI cabin conditions · Engagement Gauge</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0b1220; color: #e2e8f0; }
+      * { box-sizing: border-box; }
+      body { max-width: 1400px; margin: auto; padding: 28px; }
+      a { color: #67e8f9; } h1 { margin-bottom: 8px; } h2 { font-size: 20px; }
+      p, small { color: #a9bacf; line-height: 1.6; } label { display: inline-block; max-width: 100%; font-size: 14px; color: #bac9db; }
+      select, input, button { color: #e2e8f0; background: #172438; border: 1px solid #3c506b; border-radius: 7px; padding: 9px; margin: 5px; }
+      select { max-width: 100%; } button { cursor: pointer; } button[aria-pressed="true"] { border-color: #67e8f9; }
+      .panel { background: #101c2e; border: 1px solid #273951; border-radius: 12px; padding: 20px; margin: 18px 0; }
+      .filters, .cards { display: flex; gap: 14px; flex-wrap: wrap; }
+      .cards > div { flex: 1; min-width: 145px; background: #152339; padding: 18px; border-radius: 10px; }
+      .cards strong { display: block; font-size: 25px; margin-bottom: 4px; }
+      .scroll { overflow: auto; } table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { padding: 10px; text-align: left; border-bottom: 1px solid #2c3d54; white-space: nowrap; }
+      th { color: #b8c9dd; } tbody tr:hover { background: #1b3048; }
+      .heat { background: hsl(18 65% 30% / var(--heat)); } .muted { color: #9bacc1; }
+      #chart { width: 100%; min-width: 900px; min-height: 270px; display: block; }
+      #hover { min-height: 25px; color: #c0d6e9; } #status { min-height: 25px; }
+      .legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; }
+      .legend span::before { content: '● '; color: var(--color); }
+      input[type="number"] { width: 85px; }
+      @media (max-width: 650px) { body { padding: 14px; } .panel { padding: 12px; } }
+    </style>
+  </head>
+  <body>
+    <a href="/">← Engagement Gauge</a>
+    <h1>TRQI cabin conditions</h1>
+    <p>MCU junction temperature through startup and cabin conditioning. Outside temperature and HVAC fields are provisional CAN candidates. Route time measures recorded operation; device power-on time is unknown.</p>
+    <p id="status" role="status">Loading telemetry…</p>
+    <div class="panel filters">
+      <label>Device <select id="device"><option value="">All</option></select></label>
+      <label>Firmware <select id="firmware"><option value="">All</option></select></label>
+      <label>Route phase <select id="phase"><option>All</option></select></label>
+      <label>Blower candidate <select id="hvac"><option>All</option><option>On</option><option>Off</option><option>Unknown</option></select></label>
+      <button id="refresh">Refresh</button>
+      <a id="conditions-export" href="/api/trqi-temperatures/conditions.csv">Export conditions CSV</a>
+    </div>
+    <div id="summary" class="cards" aria-label="Temperature summary"></div>
+    <section class="panel">
+      <h2>Conditions across drives</h2>
+      <p>Each valid second has equal weight. Counts show the evidence behind each cell; longer drives contribute more time. Missing comparison signals remain “Unknown.” Speed is an exploratory comparison.</p>
+      <div id="groups">
+        <button data-group="startup" aria-pressed="true">Startup temperature × phase</button>
+        <button data-group="outside" aria-pressed="false">Outside temperature × phase</button>
+        <button data-group="blower" aria-pressed="false">Blower × phase</button>
+        <button data-group="speed" aria-pressed="false">Speed × phase</button>
+      </div>
+      <label>Minimum valid seconds <input id="min-seconds" type="number" min="1" value="30" /></label>
+      <label>Minimum drives <input id="min-drives" type="number" min="1" value="1" /></label>
+      <div id="conditions" class="scroll"></div>
+    </section>
+    <section class="panel">
+      <h2>Drive temperatures and fault timeline</h2>
+      <label>Drive <select id="drive"><option value="">Choose a drive</option></select></label>
+      <label>From minute <input id="from" type="number" min="0" value="0" /></label>
+      <label>To minute <input id="to" type="number" min="0" placeholder="End" /></label>
+      <button id="zoom">Apply window</button>
+      <a id="samples-export" hidden>Export original samples CSV</a>
+      <p id="drive-note">Select a drive to inspect its temperature and diagnostics.</p>
+      <div class="legend"><span style="--color: #67e8f9">TRQI</span><span style="--color: #86efac">Outside candidate</span><span style="--color: #fbbf24">82 °C warning</span><span style="--color: #fb7185">85 °C firmware fault threshold</span></div>
+      <div class="scroll"><svg id="chart" viewBox="0 0 1100 410" role="img" aria-label="TRQI temperature, outside-temperature candidate, and fault timeline"></svg></div>
+      <div id="hover" aria-live="polite"></div>
+      <small>Temperature curves use the one-second grid. Original reports, raw ADC values, flags and CRC results are preserved in CSV. Fault-state lanes follow the reported bits and their freshness.</small>
+    </section>
+    <section class="panel">
+      <h2>Drive evidence</h2>
+      <p>Initial temperature is the first valid reported reading within 30 seconds of a known route start. Δ values compare with the temperature at 5, 15 or 30 minutes; unavailable observations remain blank. This does not measure parked cabin temperature or isolate device self-heating.</p>
+      <div id="drives" class="scroll"></div>
+    </section>
+    <section class="panel">
+      <h2>Coverage and interpretation</h2>
+      <div id="coverage" class="scroll"></div>
+      <p>TRQI temperature expires after 1.5 seconds, speed and control context after 2 seconds, outside temperature after 60 seconds, and HVAC state after 5 seconds. Invalid readings and missing segments remain gaps. A 30-second mean requires 30 consecutive valid seconds. Exposure durations use the one-second grid and are approximate.</p>
+      <p>Outside temperature × phase is a weather comparison. MCU minus outside temperature is not a self-heating estimate. Blower/A/C requests do not establish actual cooling. Firmware “Unknown” means application identity was absent from the recorded logs. Installation and hardware revisions are not inferred.</p>
+    </section>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const fmt = (value, suffix = '') => value === null || value === undefined ? '—' : Number(value).toFixed(1) + suffix;
+      const hours = (seconds) => seconds < 60 ? fmt(seconds, ' s') : seconds < 3600 ? fmt(seconds / 60, ' min') : fmt(seconds / 3600, ' h');
+      let report = null, selectedDrive = null, group = 'startup', revision = 0, driveRevision = 0;
+      function el(tag, text) { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; return item; }
+      function table(target, headings, rows) {
+        const node = el('table'), head = el('thead'), tr = el('tr'), body = el('tbody');
+        headings.forEach((label) => tr.append(el('th', label))); head.append(tr); node.append(head, body);
+        rows.forEach((values) => { const row = el('tr'); values.forEach((value) => row.append(el('td', value))); body.append(row); });
+        $(target).replaceChildren(node); return body;
+      }
+      function params() {
+        const query = new URLSearchParams();
+        for (const id of ['device', 'firmware', 'phase', 'hvac']) if ($(id).value) query.set(id, $(id).value);
+        return query;
+      }
+      async function fetchJSON(url) {
+        const response = await fetch(url); if (!response.ok) throw new Error(`Request failed (${response.status})`); return response.json();
+      }
+      function options(id, values) {
+        const value = $(id).value; $(id).replaceChildren(new Option('All', ''));
+        values.forEach((item) => $(id).append(new Option(item, item))); $(id).value = values.includes(value) ? value : '';
+      }
+      async function load() {
+        const current = ++revision;
+        try {
+          const result = await fetchJSON('/api/trqi-temperatures?' + params()); if (current !== revision) return; report = result;
+          options('device', report.devices); options('firmware', report.firmwares);
+          const phase = $('phase').value; $('phase').replaceChildren(...['All', ...report.phases].map((item) => new Option(item, item))); $('phase').value = phase;
+          const s = report.summary;
+          $('summary').replaceChildren(...[
+            [fmt(s.median, ' °C'), 'Median TRQI'], [fmt(s.p95, ' °C'), '95th percentile'],
+            [fmt(s.maximum, ' °C'), 'Maximum · one-second grid'], [hours(s.seconds_ge_82), 'Time ≥82 °C'],
+            [hours(s.seconds_ge_85), 'Time ≥85 °C'], [hours(s.valid_seconds), 'Valid observation time'],
+          ].map(([value, label]) => { const card = el('div'); card.append(el('strong', value), el('span', label)); return card; }));
+          $('status').textContent = report.drives.length ? `${report.drives.length} drives · ${hours(s.valid_seconds)} valid / ${hours(s.observed_seconds)} observed under filters · ${report.pending_snapshots} incomplete snapshots · Last sync ${report.sync.last_sync_at || 'unknown'}${report.sync.last_error ? ' · Sync error: ' + report.sync.last_error : ''}` : 'No TRQI telemetry yet. This view fills after a device upload and server sync.';
+          $('conditions-export').href = '/api/trqi-temperatures/conditions.csv?' + params();
+          drawConditions(); drawDrives();
+        } catch (error) { if (current === revision) $('status').textContent = error.message; }
+      }
+      function drawConditions() {
+        if (!report) return;
+        const minimum = Math.max(1, Number($('min-seconds').value) || 1), drives = Math.max(1, Number($('min-drives').value) || 1);
+        const cells = report.cells.filter((cell) => cell.kind === group), bands = [...new Set(cells.map((cell) => cell.band))];
+        bands.sort((a, b) => a === null ? 1 : b === null ? -1 : typeof a === 'number' ? a - b : String(a).localeCompare(String(b)));
+        if (!bands.length) { $('conditions').textContent = 'No observations match these filters.'; return; }
+        const label = (band) => band === null || band === 'Unknown' ? 'Unknown' : group === 'startup' ? `${band}–${band + 10} °C` : group === 'outside' ? `${band}–${band + 5} °C` : group === 'speed' ? `${band} km/h` : band;
+        const body = table('conditions', ['Condition / phase', ...report.phases], bands.map((band) => [label(band), ...report.phases.map((phase) => {
+          const cell = cells.find((item) => item.band === band && item.phase === phase);
+          return !cell ? '—' : cell.seconds < minimum || cell.drives < drives ? `Low coverage · ${cell.seconds}s / ${cell.drives} drives` : `${fmt(cell.p95)} °C P95 · ${cell.seconds}s / ${cell.drives} drives`;
+        })]));
+        [...body.rows].forEach((row, i) => [...row.cells].slice(1).forEach((td, j) => {
+          const cell = cells.find((item) => item.band === bands[i] && item.phase === report.phases[j]);
+          if (cell) { td.title = `Median ${fmt(cell.median)} °C; maximum ${fmt(cell.maximum)} °C; ≥82 °C: ${cell.seconds_ge_82}s; ≥85 °C: ${cell.seconds_ge_85}s`; if (cell.seconds >= minimum && cell.drives >= drives) { td.className = 'heat'; td.style.setProperty('--heat', Math.max(.05, Math.min(.85, (cell.p95 - 40) / 55))); } }
+        }));
+      }
+      function drawDrives() {
+        const previous = $('drive').value;
+        $('drive').replaceChildren(new Option('Choose a drive', ''));
+        report.drives.forEach((drive, index) => $('drive').append(new Option(`${drive.metadata.recorded_at || drive.drive} · ${drive.device} · ${drive.metadata.firmware}`, String(index))));
+        table('drives', ['Drive', 'Firmware', 'Initial °C', 'Median / P95 °C', 'Raw max °C', '30s max mean °C', 'Δ5 / 15 / 30 min °C', '≥82 / ≥85 sec', 'Fault / pending sec', 'Valid / observed'], report.drives.map((drive) => {
+          const s = drive.summary; return [drive.drive, drive.metadata.firmware, fmt(s.initial), `${fmt(s.median)} / ${fmt(s.p95)}`, fmt(s.raw_maximum), fmt(s.sustained_30s), `${fmt(s.delta_5m)} / ${fmt(s.delta_15m)} / ${fmt(s.delta_30m)}`, `${s.seconds_ge_82} / ${s.seconds_ge_85}`, `${s.fault_seconds} / ${s.pending_seconds}`, `${s.valid_seconds}s / ${s.observed_seconds}s`];
+        }));
+        table('coverage', ['Drive / segment', 'MCU frames', 'Valid', 'Invalid', 'CRC errors', 'Malformed', 'Repeated', 'Counter discontinuities'], report.drives.flatMap((drive) => drive.coverage.map((c) => [`${drive.drive} / ${c.segment}`, c.frames, c.valid, c.invalid, c.crc_errors, c.malformed, c.repeated, c.counter_discontinuities])));
+        if (previous !== '' && report.drives[Number(previous)] && selectedDrive && report.drives[Number(previous)].drive === selectedDrive.drive && report.drives[Number(previous)].device === selectedDrive.device) { $('drive').value = previous; if (report.drives[Number(previous)].cursor !== selectedDrive.cursor) loadDrive(); }
+        else { selectedDrive = null; $('chart').replaceChildren(); $('samples-export').hidden = true; $('drive-note').textContent = 'Select a drive to inspect its temperature and diagnostics.'; ++driveRevision; }
+      }
+      async function loadDrive() {
+        const current = ++driveRevision, drive = report?.drives[Number($('drive').value)];
+        if ($('drive').value === '' || !drive) { selectedDrive = null; $('chart').replaceChildren(); $('samples-export').hidden = true; return; }
+        try {
+          const query = new URLSearchParams({device: drive.device, drive: drive.drive});
+          const result = await fetchJSON('/api/trqi-temperatures/drive?' + query); if (current !== driveRevision) return; selectedDrive = result;
+          $('samples-export').href = '/api/trqi-temperatures/samples.csv?' + query; $('samples-export').hidden = false;
+          $('drive-note').textContent = `${drive.drive} · ${result.metadata.firmware} · ${result.grid.some((row) => row.elapsed !== null) ? 'Minutes since recorded route start' : 'Route start unknown; minutes since first retained observation'} · Full-drive view; report phase/blower filters apply to the conditions table.`;
+          $('from').value = '0'; $('to').value = ''; drawChart();
+        } catch (error) { if (current === driveRevision) $('drive-note').textContent = error.message; }
+      }
+      function svg(tag, attributes, text) {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, String(value))); if (text !== undefined) node.textContent = text; return node;
+      }
+      function drawChart() {
+        const chart = $('chart'); chart.replaceChildren(); $('hover').textContent = '';
+        if (!selectedDrive) return;
+        const from = Math.max(0, Number($('from').value) * 60), to = $('to').value === '' ? Infinity : Number($('to').value) * 60;
+        const rows = selectedDrive.grid.filter((row) => row.time_s >= from && row.time_s <= to);
+        if (!rows.length) { $('hover').textContent = 'No observations in this window.'; return; }
+        const left = 125, right = 1080, top = 20, bottom = 255, start = rows[0].time_s, end = Math.max(start + 1, rows.at(-1).time_s);
+        const temperatures = rows.flatMap((row) => [row.trqi, row.outside]).filter((value) => value !== null);
+        const low = Math.floor(temperatures.reduce((a, b) => Math.min(a, b), 40) / 10) * 10 - 5, high = Math.ceil(temperatures.reduce((a, b) => Math.max(a, b), 90) / 10) * 10 + 5;
+        const x = (time) => left + (time - start) / (end - start) * (right - left), y = (value) => bottom - (value - low) / (high - low) * (bottom - top);
+        for (let value = Math.ceil(low / 10) * 10; value <= high; value += 10) { chart.append(svg('line', {x1: left, x2: right, y1: y(value), y2: y(value), stroke: '#293d54'}), svg('text', {x: left - 10, y: y(value) + 4, fill: '#a9bacf', 'font-size': 12, 'text-anchor': 'end'}, `${value} °C`)); }
+        for (const [threshold, color] of [[82, '#fbbf24'], [85, '#fb7185']]) chart.append(svg('line', {x1: left, x2: right, y1: y(threshold), y2: y(threshold), stroke: color, 'stroke-dasharray': '5 5'}));
+        for (const [metric, color] of [['trqi', '#67e8f9'], ['outside', '#86efac']]) {
+          let points = [], previous = null;
+          const flush = () => { if (points.length) chart.append(svg('polyline', {points: points.join(' '), fill: 'none', stroke: color, 'stroke-width': 1.5})); points = []; };
+          rows.forEach((row) => { if (row[metric] === null || (previous !== null && row.time_s - previous > 1.5)) flush(); if (row[metric] !== null) points.push(`${x(row.time_s)},${y(row[metric])}`); previous = row.time_s; }); flush();
+        }
+        const lanes = [['high_temp_error', 'Temp fault', '#fb7185'], ['disengage_pending', 'Grace pending', '#fbbf24'], ['vdda_warn', 'VDDA warning', '#c4b5fd'], ['blower_on', 'Blower candidate', '#86efac'], ['ac_request', 'A/C request', '#6ee7b7'], ['lateral_active', 'Lateral active', '#67e8f9'], ['relay_active', 'TRQI relay', '#93c5fd']];
+        lanes.forEach(([metric, label, color], index) => {
+          const yy = 278 + index * 16; chart.append(svg('text', {x: left - 8, y: yy + 9, fill: '#a9bacf', 'font-size': 11, 'text-anchor': 'end'}, label));
+          chart.append(svg('line', {x1: left, x2: right, y1: yy + 4, y2: yy + 4, stroke: '#293d54'}));
+          rows.forEach((row) => { if (row[metric]) chart.append(svg('rect', {x: x(row.time_s), y: yy, width: Math.max(1, (right - left) / (end - start)), height: 8, fill: color})); });
+        });
+        for (let i = 0; i <= 5; ++i) { const time = start + (end - start) * i / 5; chart.append(svg('text', {x: x(time), y: 395, fill: '#a9bacf', 'font-size': 12, 'text-anchor': i === 5 ? 'end' : 'middle'}, fmt(time / 60, ' min'))); }
+        chart.onpointermove = (event) => {
+          const rect = chart.getBoundingClientRect(), xx = (event.clientX - rect.left) / rect.width * 1100;
+          const time = start + (xx - left) / (right - left) * (end - start), row = rows.reduce((best, item) => Math.abs(item.time_s - time) < Math.abs(best.time_s - time) ? item : best, rows[0]);
+          $('hover').textContent = `${fmt(row.time_s / 60)} min · TRQI ${fmt(row.trqi, ' °C')} · Outside ${fmt(row.outside, ' °C')} · Speed ${fmt(row.speed, ' km/h')} · Blower ${row.blower_on === null ? 'unknown' : row.blower_on ? 'on' : 'off'} · Temperature fault ${row.high_temp_error === null ? 'unknown' : row.high_temp_error ? 'active' : 'clear'}`;
+        };
+      }
+      for (const id of ['device', 'firmware', 'phase', 'hvac']) $(id).addEventListener('change', load);
+      $('refresh').onclick = load; $('drive').onchange = loadDrive; $('zoom').onclick = drawChart;
+      for (const id of ['min-seconds', 'min-drives']) $(id).onchange = drawConditions;
+      $('groups').onclick = (event) => { if (!event.target.dataset.group) return; group = event.target.dataset.group; document.querySelectorAll('[data-group]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.group === group))); drawConditions(); };
+      load();
+    </script>
+  </body>
+</html>

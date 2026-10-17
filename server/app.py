@@ -12,6 +12,7 @@ from .drive_stats_sync import DriveStatsSyncConfig, DriveStatsSynchronizer
 from .web_auth import install_auth, csrf_token
 from .temperature_sync import TemperatureSyncConfig, TemperatureSynchronizer
 from .temperature_routes import router as temperature_router
+from .trqi_temperature.routes import router as trqi_temperature_router
 
 
 @asynccontextmanager
@@ -42,6 +43,7 @@ app = FastAPI(
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / 'templates'))
 install_auth(app, templates)
 app.include_router(temperature_router)
+app.include_router(trqi_temperature_router)
 
 
 @app.get('/', summary='Engagement Gauge home', response_class=HTMLResponse)

@@ -329,3 +329,38 @@ Use SQLite's backup API to back up a running destination before importing.
 ```bash
 .venv/bin/python -m unittest server.test_temperature_import server.test_temperatures
 ```
+
+## TRQI cabin conditions
+
+`/trqi-temperatures` and `/api/trqi-temperatures` expose the separate
+`server/trqi_temperature` module. It consumes `trqi_temperature` schema-2 batches
+through the existing temperature synchronizer and its URL/token configuration.
+The module publishes only complete snapshots into its own `trqi_*` tables,
+preserving retained segments across source-log deletion without mixing HRR
+metrics or schema identities. Existing authentication protects the page, drive
+API, conditions CSV and original-samples CSV. No separate frontend build is
+needed for this Jinja dashboard.
+
+The main comparisons are startup temperature × recorded route phase, outside
+temperature × phase, and blower state × phase. Speed is a secondary exploratory
+view. Each drive includes initial temperature, median/P95, original-report peak,
+highest continuous 30-second mean, changes at 5/15/30 minutes, and one-second
+grid exposure at ≥82/85 °C. The drive plot shows temperature and fault/control
+state lanes with a selectable time window. Conditions filters apply to summary
+cards and cells; drive evidence and drive plots remain full-drive views.
+
+TRQI temperature expires after 1.5 seconds, speed/control context after 2 seconds,
+HVAC after 5 seconds and outside after 60 seconds. CRC failures and invalid
+readings break temperature availability. Missing segments stay gaps. Route start
+is not power-on; routes missing the initial segment have unknown startup and
+phase. Outside/HVAC decodes are provisional, and MCU temperature measures the
+junction rather than cabin air. Hardware/installation revisions are not inferred.
+Firmware identity comes only from passively logged application-info frames.
+
+Deploy goranConnectServer's TRQI validator before enabling device collection.
+These checkouts do not run on the openpilot device; changing them does not
+deploy or restart the remote services. Focused checks:
+
+```bash
+python -m pytest -q server/test_trqi_temperatures.py server/test_temperatures.py server/test_temperature_import.py
+```

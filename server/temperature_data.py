@@ -230,6 +230,11 @@ def _grid(
 
 def _publish(db: sqlite3.Connection, identity: tuple) -> None:
     device, drive, collector, version, source = identity
+    if collector == 'trqi_temperature':
+        from .trqi_temperature.data import publish
+
+        publish(db, identity)
+        return
     if collector != 'hrr_temperature' or version not in (1, 2):
         return
     if db.execute(
