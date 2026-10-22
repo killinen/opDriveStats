@@ -65,12 +65,12 @@ class WebAuthTests(unittest.TestCase):
         return re.search(r'name="csrf" value="([^"]+)"', response.text).group(1)
 
     def test_every_dashboard_and_data_route_requires_access(self):
-        for path in ('/', '/stats', '/stats_mod', '/compare', '/total_stats', '/total_stats/style4', '/docs', '/redoc'):
+        for path in ('/', '/stats', '/stats_mod', '/compare', '/trends', '/total_stats', '/total_stats/style4', '/docs', '/redoc'):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 303)
                 self.assertTrue(response.headers['location'].startswith('/login?next='))
-        for path in ('/api/data', '/api/compare', '/api/total_stats', '/devices', '/devices/abc', '/openapi.json'):
+        for path in ('/api/data', '/api/compare', '/api/trends', '/api/total_stats', '/devices', '/devices/abc', '/openapi.json'):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 401)
         self.assertEqual(self.client.get('/health').json(), {'status': 'ok'})

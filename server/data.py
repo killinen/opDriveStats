@@ -6,6 +6,8 @@ from threading import Lock
 from statistics import mean
 from typing import Any, Dict, List, Optional
 
+from .drive_dates import resolve_drive_date
+
 _DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / 'engagement_db.json'
 
 SPEED_BUCKETS = [
@@ -694,10 +696,16 @@ class EngagementRepository:
     def format_drive_details(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         formatted: List[Dict[str, Any]] = []
         for row in rows:
-            drive_start = _parse_drive_timestamp(row.get('drive'))
+            drive_date = resolve_drive_date(row)
+            timeline_at = drive_date.timestamp.isoformat() if drive_date.timestamp else None
             formatted.append({
                 'drive': row.get('drive'),
-                'drive_started_at': drive_start.isoformat() if drive_start else None,
+                'drive_started_at': timeline_at if not drive_date.is_estimated else None,
+                'timeline_at': timeline_at,
+                'timeline_date_source': drive_date.source,
+                'timeline_date_is_estimated': drive_date.is_estimated,
+                'recorded_at': row.get('recorded_at'),
+                'uploaded_at': row.get('uploaded_at'),
                 'engagement_pct': row.get('engagement_pct'),
                 'engagement_pct_odo': row.get('engagement_pct_odo'),
                 'drive_time_hours': round(_ns_to_hours(row.get('drive_time')), 3),
@@ -724,7 +732,7 @@ class EngagementRepository:
                 'git_commit': row.get('git_commit'),
             })
 
-        formatted.sort(key=lambda item: item['drive_started_at'] or '', reverse=True)
+        formatted.sort(key=lambda item: item['timeline_at'] or '', reverse=True)
         return formatted
 
 

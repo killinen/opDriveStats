@@ -13,6 +13,7 @@ from .web_auth import install_auth, csrf_token
 from .temperature_sync import TemperatureSyncConfig, TemperatureSynchronizer
 from .temperature_routes import router as temperature_router
 from .trqi_temperature.routes import router as trqi_temperature_router
+from .trends import build_trends
 
 
 @asynccontextmanager
@@ -143,6 +144,41 @@ def api_compare_view(
         branch=branch,
         speed_bucket=speed_bucket,
     )
+
+
+@app.get('/api/trends', summary='Weekly rolling speed-bucket performance')
+def api_trends_view(
+    device: Optional[List[str]] = Query(None),
+    branch: Optional[List[str]] = Query(None),
+    window_weeks: int = 4,
+    history_weeks: int = 26,
+    metric: str = 'distance',
+    include_estimates: bool = True,
+    device_view: str = 'individual',
+) -> dict:
+    return build_trends(
+        repository.all_entries(), device_ids=device, branches=branch,
+        window_weeks=window_weeks, history_weeks=history_weeks,
+        metric=metric, include_estimates=include_estimates,
+        device_view=device_view,
+    )
+
+
+@app.get('/trends', summary='Performance over time', response_class=HTMLResponse)
+def trends_view(
+    request: Request,
+    device: Optional[List[str]] = Query(None),
+    branch: Optional[List[str]] = Query(None),
+    window_weeks: int = 4,
+    history_weeks: int = 26,
+    metric: str = 'distance',
+    include_estimates: bool = True,
+    device_view: str = 'individual',
+) -> HTMLResponse:
+    trends = api_trends_view(device, branch, window_weeks, history_weeks, metric, include_estimates, device_view)
+    return templates.TemplateResponse('trends.html', {'request': request, 'trends': trends})
+
+
 @app.get('/total_stats', summary='Modern engagement dashboard with totals', response_class=HTMLResponse)
 def total_stats_view(request: Request) -> HTMLResponse:
     summary = repository.grand_total_summary()

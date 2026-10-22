@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080b12">
+    <title>Trends · Engagement Gauge</title>
+    <style>
+        :root { color-scheme: dark; --page:#080b12; --panel:#10141d; --line:#28303f; --text:#f5f7fb; --muted:#a1aabd; --violet:#a793ff; --cyan:#70d7e2; --orange:#f2b56e; }
+        * { box-sizing:border-box; }
+        body { margin:0; color:var(--text); background:radial-gradient(ellipse at 10% 0, #211a3b66, transparent 45rem), var(--page); font:15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+        a { color:inherit; text-underline-offset:4px; }
+        button, select, input { font:inherit; }
+        button, summary, select, input { cursor:pointer; }
+        a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline:2px solid var(--cyan); outline-offset:4px; }
+        .shell { width:min(1320px, calc(100% - 48px)); margin:auto; padding-bottom:48px; }
+        .topbar { display:flex; justify-content:space-between; align-items:center; gap:20px; min-height:76px; border-bottom:1px solid var(--line); }
+        .brand { font-weight:750; text-decoration:none; letter-spacing:-.03em; }
+        .brand span { display:inline-grid; place-content:center; width:28px; height:28px; margin-right:8px; color:var(--cyan); background:#70d7e215; border:1px solid #70d7e244; border-radius:8px; }
+        nav { display:flex; flex-wrap:wrap; gap:22px; font-size:13px; color:var(--muted); }
+        nav a { text-decoration:none; }
+        nav [aria-current] { color:var(--text); }
+        .intro { padding:38px 0 24px; display:flex; justify-content:space-between; align-items:end; gap:24px; }
+        .eyebrow { color:var(--cyan); font-size:11px; text-transform:uppercase; letter-spacing:.16em; font-weight:750; margin:0 0 9px; }
+        h1 { font-size:clamp(28px,4vw,40px); line-height:1.15; letter-spacing:-.045em; margin:0 0 12px; font-weight:700; }
+        p { margin:0; }
+        .muted { color:var(--muted); }
+        .intro p:last-child { max-width:690px; }
+        .cadence { flex-shrink:0; border:1px solid #a793ff44; color:#c5b8ff; background:#a793ff0a; padding:7px 12px; border-radius:30px; font-size:12px; }
+        .filters { display:flex; align-items:end; flex-wrap:wrap; gap:12px; padding:18px; border:1px solid var(--line); background:var(--panel); border-radius:16px; }
+        .field { display:flex; flex-direction:column; gap:6px; flex:1 1 150px; min-width:0; }
+        .field > label, .field > span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.07em; font-weight:650; }
+        select, .chooser > summary { width:100%; height:40px; padding:8px 10px; border:1px solid #343d4f; border-radius:8px; background:#0c1018; color:var(--text); font-size:13px; }
+        .chooser { position:relative; }
+        .chooser > summary { list-style:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .chooser > summary::after { content:'⌄'; float:right; color:var(--muted); }
+        .choices { position:absolute; left:0; top:46px; width:max(100%, 240px); max-width:calc(100vw - 60px); max-height:300px; overflow:auto; z-index:5; padding:10px; border:1px solid #414b60; background:#151b29; box-shadow:0 18px 50px #0009; border-radius:10px; }
+        .choices label { display:flex; align-items:center; gap:9px; padding:7px 5px; overflow-wrap:anywhere; font-size:13px; }
+        .choices input { accent-color:var(--violet); }
+        .choices button { padding:5px; color:var(--cyan); background:transparent; border:0; font-size:12px; }
+        .apply { padding:9px 17px; height:40px; border:1px solid #b1a0ff; border-radius:8px; background:#9b87f5; color:#100d20; font-weight:750; }
+        .filter-footer { display:flex; align-items:center; gap:16px; margin:12px 2px 22px; font-size:12px; color:var(--muted); }
+        .filter-footer a { margin-left:auto; }
+        .coverage { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+        .stat { border:1px solid var(--line); border-radius:12px; background:#10141d99; padding:14px 18px; }
+        .stat strong { font-size:25px; font-weight:650; letter-spacing:-.04em; }
+        .stat span { display:block; font-size:12px; color:var(--muted); margin-top:2px; }
+        .stat.estimate strong { color:var(--orange); }
+        .chart-intro { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:27px 0 14px; }
+        .chart-intro h2 { font-size:17px; margin:0; font-weight:650; }
+        .device-summaries { display:flex; flex-wrap:wrap; gap:12px; margin:18px 0 8px; }
+        .device-summary { flex:1 1 200px; min-width:0; padding:12px 14px; border:1px solid var(--line); border-radius:10px; }
+        .device-name { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:9px; overflow-wrap:anywhere; }
+        .device-swatch { display:inline-block; width:18px; height:3px; background:var(--device); flex-shrink:0; }
+        .device-volume { font-size:11px; color:var(--muted); margin-top:7px; }
+        .legend { display:flex; flex-wrap:wrap; gap:17px; font-size:11px; color:var(--muted); }
+        .legend span { display:inline-flex; align-items:center; gap:6px; }
+        .dot { width:7px; height:7px; border-radius:50%; background:var(--violet); }
+        .ring { width:9px; height:9px; border:1.5px solid var(--orange); border-radius:50%; }
+        .hollow { width:7px; height:7px; border:1px solid var(--muted); border-radius:50%; }
+        .bucket { --bucket:var(--violet); position:relative; margin:0 0 18px; padding:22px 24px 14px; border:1px solid var(--line); border-radius:18px; background:linear-gradient(110deg,#151a27,#10141d 55%); }
+        .bucket.road { --bucket:var(--cyan); }
+        .bucket.highway { --bucket:#8dd5a3; }
+        .bucket-head { display:flex; justify-content:space-between; align-items:start; gap:16px; }
+        .bucket h3 { font-size:18px; margin:0 0 3px; letter-spacing:-.02em; }
+        .bucket h3::before { content:''; display:inline-block; width:8px; height:8px; background:var(--bucket); border-radius:50%; margin:0 10px 2px 0; }
+        .bucket-subtitle { font-size:12px; color:var(--muted); }
+        .headline { text-align:left; }
+        .headline .value { font-size:30px; line-height:1.1; font-weight:650; letter-spacing:-.04em; }
+        .headline .unit { font-size:13px; color:var(--muted); margin-left:4px; }
+        .change { font-size:11px; color:var(--muted); margin-top:7px; }
+        .change.good { color:#8dd5a3; }
+        .change.bad { color:#f3a39e; }
+        .chart { position:relative; margin-top:12px; min-height:235px; }
+        .chart svg { display:block; width:100%; overflow:visible; }
+        .chart svg text { fill:var(--muted); font-size:11px; font-family:inherit; }
+        .chart circle:focus { outline:none; stroke:#fff; stroke-width:3; }
+        .volume-note { font-size:10px; letter-spacing:.02em; color:var(--muted); }
+        .tooltip { position:absolute; z-index:4; pointer-events:none; width:260px; max-width:95%; border:1px solid #4a5367; border-radius:10px; padding:12px 14px; background:#0b0f19f5; box-shadow:0 12px 35px #0009; font-size:12px; }
+        .tooltip[hidden] { display:none; }
+        .tooltip strong { display:block; margin-bottom:7px; color:var(--bucket); }
+        .tooltip p { display:flex; justify-content:space-between; gap:12px; margin-top:4px; }
+        .tooltip .detail { color:var(--muted); display:block; margin-top:7px; }
+        .tooltip .estimate-note { color:var(--orange); }
+        .tooltip-device { border-left:3px solid var(--device); padding-left:9px; margin-top:10px; }
+        .tooltip-device .device-name { color:var(--device); margin-bottom:3px; }
+        .chart-foot { border-top:1px solid #252b3866; margin-top:2px; padding-top:11px; display:flex; justify-content:space-between; align-items:center; gap:14px; font-size:11px; color:var(--muted); }
+        .chart-foot summary { padding:2px 0; }
+        .data-table { overflow-x:auto; margin-top:14px; }
+        table { border-collapse:collapse; width:100%; min-width:560px; font-size:12px; }
+        th,td { text-align:right; border-bottom:1px solid var(--line); padding:9px; }
+        th { color:var(--muted); font-weight:500; }
+        th:first-child,td:first-child { text-align:left; }
+        .method { margin:24px 0; padding:20px 24px; border:1px solid var(--line); border-radius:14px; font-size:13px; color:var(--muted); }
+        .method summary { color:var(--text); font-weight:650; }
+        .method p { margin-top:13px; max-width:1000px; }
+        .empty-state { margin:18px 0; padding:22px; background:#a793ff0d; border:1px solid #a793ff44; border-radius:12px; }
+        footer { display:flex; justify-content:space-between; gap:20px; color:var(--muted); font-size:11px; }
+        @media (max-width:800px) { .shell { width:calc(100% - 28px); } .topbar { padding:14px 0; flex-wrap:wrap; } nav { gap:15px; } .intro { padding-top:28px; } .cadence { display:none; } .coverage { grid-template-columns:repeat(2,1fr); } .chart-intro { align-items:start; flex-direction:column; gap:9px; } .bucket { padding:18px 14px 12px; } .chart { min-height:150px; } .field { flex-basis:calc(50% - 12px); } .headline .value { font-size:25px; } .chart-foot { align-items:start; } }
+        @media (prefers-reduced-motion:no-preference) { .apply { transition:filter .15s; } .apply:hover { filter:brightness(1.1); } }
+    </style>
+</head>
+<body>
+<main class="shell">
+    <header class="topbar">
+        <a class="brand" href="/"><span aria-hidden="true">↗</span> Engagement Gauge</a>
+        <nav aria-label="Main navigation"><a href="/stats_mod">Dashboard</a><a href="/compare">Compare</a><a href="/trends" aria-current="page">Trends</a><a href="/total_stats">Fleet totals</a></nav>
+    </header>
+    <section class="intro">
+        <div><p class="eyebrow">Engagement trends</p><h1>Performance over time</h1><p class="muted">See how engagement changes within each speed bucket, with the driving distance behind every point.</p></div>
+        <div class="cadence">Weekly points · {{ trends.window_weeks }}-week rolling window</div>
+    </section>
+    <form method="get" action="/trends">
+        <div class="filters">
+            <div class="field"><label for="metric">Metric</label><select id="metric" name="metric">{% for key,info in trends.metrics.items() %}<option value="{{ key }}" {% if key == trends.metric %}selected{% endif %}>{{ info.label }}</option>{% endfor %}</select></div>
+            <div class="field"><label for="window">Rolling window</label><select id="window" name="window_weeks">{% for n in [4,8,12] %}<option value="{{ n }}" {% if n == trends.window_weeks %}selected{% endif %}>{{ n }} weeks</option>{% endfor %}</select></div>
+            <div class="field"><label for="history">Show history</label><select id="history" name="history_weeks">{% for n,label in [(13,'Last 13 weeks'),(26,'Last 26 weeks'),(52,'Last 52 weeks'),(0,'All history')] %}<option value="{{ n }}" {% if n == trends.history_weeks %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+            {% for key,label,options,selected in [('device','Devices',trends.devices,trends.selected_devices),('branch','Branches',trends.branches,trends.selected_branches)] %}
+            <div class="field"><span id="{{ key }}-label">{{ label }}</span><details class="chooser" data-empty-label="{{ 'Newest device' if key == 'device' else 'All branches' }}"><summary aria-labelledby="{{ key }}-label">{{ selected[0] if selected|length == 1 else selected|length ~ ' selected' if selected else 'Newest device' if key == 'device' else 'All branches' }}</summary><div class="choices">{% if key == 'device' %}<button type="button" data-select-all>Select all devices</button>{% endif %}<button type="button" data-clear="{{ key }}">{{ 'Use newest device' if key == 'device' else 'Clear selection · use all' }}</button>{% for option in options %}<label><input type="checkbox" name="{{ key }}" value="{{ option }}" {% if option in selected %}checked{% endif %}>{{ option }}</label>{% endfor %}</div></details></div>
+            {% endfor %}
+            <div class="field"><label for="device-view">Device graphs</label><select id="device-view" name="device_view"><option value="individual" {% if trends.device_view == 'individual' %}selected{% endif %}>Individual devices</option><option value="combined" {% if trends.device_view == 'combined' %}selected{% endif %}>Combined devices</option></select></div>
+            <div class="field"><label for="estimates">Date policy</label><select id="estimates" name="include_estimates"><option value="true" {% if trends.include_estimates %}selected{% endif %}>Include estimates</option><option value="false" {% if not trends.include_estimates %}selected{% endif %}>Recording dates only</option></select></div>
+            <button type="submit" class="apply">Apply</button>
+        </div>
+        <div class="filter-footer"><span>All dates in UTC · {{ 'Higher' if trends.metric_info.higher_is_better else 'Lower' }} is better</span><a href="/trends">Reset filters</a></div>
+    </form>
+    <section class="coverage" aria-label="Date coverage for selected devices and branches">
+        <div class="stat"><strong>{{ trends.coverage.total_drives }}</strong><span>Drives matching filters</span></div>
+        <div class="stat"><strong>{{ trends.coverage.recording_date_drives }}</strong><span>With plausible recording dates</span></div>
+        <div class="stat estimate"><strong>{{ trends.coverage.estimated_drives }}</strong><span>Upload-date estimates · {{ 'included' if trends.include_estimates else 'excluded' }}</span></div>
+        <div class="stat"><strong>{{ trends.coverage.undated_drives }}</strong><span>Undated drives · excluded</span></div>
+    </section>
+    <p class="muted" style="font-size:11px">Date coverage covers all matching history. Charts show the selected period; missing metric fields are excluded from that metric.</p>
+    <div class="chart-intro"><h2>{{ trends.metric_info.label }} by speed bucket</h2><div class="legend"><span><i class="dot"></i>Rolling value</span><span><i class="ring"></i>Includes upload estimates</span><span><i class="hollow"></i>Under {{ trends.low_distance_km }} km in window</span></div></div>
+    {% if not trends.coverage.dated_drives %}<div class="empty-state">No dated drives match these filters. Try including upload estimates or choosing other devices and branches.</div>{% endif %}
+    {% for bucket in trends.series[:3] %}
+    {% set bucket_series = trends.series|selectattr('key', 'equalto', bucket.key)|list %}
+    <section class="bucket {{ bucket.key }}" aria-labelledby="{{ bucket.key }}-title">
+        <div class="bucket-head">
+            <div><h3 id="{{ bucket.key }}-title">{{ bucket.label }}</h3><p class="bucket-subtitle">{{ trends.window_weeks }}-week rolling {{ trends.metric_info.label|lower }} · {{ 'One line per device' if trends.device_view == 'individual' else 'Combined devices' }}</p></div>
+        </div>
+        <div class="device-summaries" aria-label="{{ bucket.label }} device legend and current values">
+            {% for series in bucket_series %}
+            <div class="device-summary" style="--device:{{ series.color }}">
+            <p class="device-name"><i class="device-swatch" aria-hidden="true"></i>{{ series.device_id if series.device_id is not none else 'Combined devices' if trends.device_view == 'combined' else 'No device data' }}</p>
+            <div class="headline"><div><span class="value">{{ '%.1f'|format(series.latest.value) if series.latest.value is not none else '—' }}</span><span class="unit">{{ trends.metric_info.unit }}</span></div>
+                {% if series.delta is not none %}<p class="change {% if series.delta != 0 %}{{ 'good' if (series.delta > 0) == trends.metric_info.higher_is_better else 'bad' }}{% endif %}">{{ '+' if series.delta > 0 else '' }}{{ '%.1f'|format(series.delta) }} {{ 'pp' if trends.metric_info.unit == '%' else '/100 km' }} vs preceding {{ trends.window_weeks }} weeks</p>{% else %}<p class="change">{{ 'No data in current window' if series.latest.value is none else 'No preceding-window comparison' }}</p>{% endif %}
+            </div>
+            <p class="device-volume">{{ series.latest.drive_count }} drives · {{ '%.0f'|format(series.latest.distance_km) }} km in current window{% if series.latest.estimated_drive_count %} · {{ series.latest.estimated_drive_count }} estimated dates{% endif %}</p>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="chart" id="chart-{{ bucket.key }}" aria-label="{{ bucket.label }} weekly trends for {{ bucket_series|length }} {{ 'devices' if trends.device_view == 'individual' else 'combined series' }}"></div>
+        <div class="chart-foot"><span>Weekly driving below · km with {{ trends.metric_info.label|lower }} data</span><span>{{ 'Bars grouped by device · colors match lines' if bucket_series|length > 1 else 'Bars show weekly driving distance' }}</span></div>
+        <details class="data-table"><summary>View weekly data</summary><table><caption class="muted">Trailing {{ trends.window_weeks }}-week windows. Final point includes today so far.</caption><thead><tr><th>Device</th><th>Window end (UTC)</th><th>{{ trends.metric_info.label }}</th><th>Window km</th><th>Drives</th><th>Estimated dates</th></tr></thead><tbody>{% for series in bucket_series %}{% for point in series.points|reverse %}<tr><td>{{ series.device_id if series.device_id is not none else 'Combined devices' }}</td><td>{{ point.date }}{{ ' · week so far' if point.partial_week else '' }}</td><td>{{ '%.2f'|format(point.value) ~ ' ' ~ trends.metric_info.unit if point.value is not none else 'No data' }}</td><td>{{ '%.1f'|format(point.distance_km) }}</td><td>{{ point.drive_count }}</td><td>{{ point.estimated_drive_count }}</td></tr>{% endfor %}{% endfor %}</tbody></table></details>
+    </section>
+    {% endfor %}
+    <details class="method"><summary>How to read these trends</summary>
+        <p>The default selection is the device with the newest usable drive date under the branch and date policy filters. In individual mode, each device has its own colored line on the same City, Road, and Highway charts. Colors match the device legend and weekly distance bars. Hover a week to compare devices, or focus a point for details. Choose “Combined devices” to pool their totals. Clear the device selection to return to the newest device.</p>
+        <p>Each point combines the preceding {{ trends.window_weeks * 7 }} calendar days, ending on its labeled date. Historical points end on Sundays; the final point includes today so far. Adjacent windows overlap. The bars show distance driven in each individual week, so you can distinguish an empty week from an empty rolling window.</p>
+        <p>Distance engagement = total engaged kilometres ÷ total driven kilometres. Time engagement = total engaged time ÷ total time, including stopped time. Rates = total events ÷ total driven kilometres × 100. Only drives with both required fields contribute. Percentages are calculated from totals, so longer drives carry their appropriate weight.</p>
+        <p>Orange rings mark windows containing dates estimated from uploads. Offline drives may arrive together and appear in their upload week. Choose “Recording dates only” to remove them. Plausible recording dates pass clock and software-date checks; this cannot prove the device clock is correct. Undated drives remain outside the timeline.</p>
+        <p>Hollow points indicate less than {{ trends.low_distance_km }} km in a window; this is a volume cue, not a statistical confidence interval. Gaps mean no usable data. Changes compare the current window with the equally long, non-overlapping window immediately before it. Branch filters apply across the complete timeline; route, weather, and driving choices can also affect engagement.</p>
+    </details>
+    <footer><span>As of {{ trends.as_of[:16]|replace('T',' ') }} UTC</span><a id="api-link" href="/api/trends">View this data as JSON ↗</a></footer>
+    <noscript><p class="empty-state">Enable JavaScript for interactive charts. All weekly values are available in the tables above.</p></noscript>
+</main>
+<script id="trend-data" type="application/json">{{ trends|tojson }}</script>
+<script>
+(() => {
+    'use strict';
+    const data = JSON.parse(document.getElementById('trend-data').textContent);
+    const api = document.getElementById('api-link');
+    api.search = location.search;
+    document.querySelectorAll('[data-clear]').forEach(button => button.addEventListener('click', () => {
+        button.closest('.choices').querySelectorAll('input').forEach(input => { input.checked = false; });
+        updateChoices(button.closest('details'));
+    }));
+    document.querySelectorAll('[data-select-all]').forEach(button => button.addEventListener('click', () => {
+        button.closest('.choices').querySelectorAll('input').forEach(input => { input.checked = true; });
+        updateChoices(button.closest('details'));
+    }));
+    function updateChoices(details) {
+        const selected = details.querySelectorAll('input:checked');
+        details.querySelector('summary').textContent = selected.length === 1 ? selected[0].value : selected.length ? `${selected.length} selected` : details.dataset.emptyLabel;
+    }
+    document.querySelectorAll('.chooser input').forEach(input => input.addEventListener('change', () => updateChoices(input.closest('details'))));
+    document.addEventListener('click', event => document.querySelectorAll('.chooser[open]').forEach(chooser => { if (!chooser.contains(event.target)) chooser.open = false; }));
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelectorAll('.chooser[open]').forEach(chooser => { chooser.open = false; }); });
+    const NS = 'http://www.w3.org/2000/svg';
+    function svgNode(tag, attrs = {}, content) {
+        const node = document.createElementNS(NS, tag);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+        if (content !== undefined) node.textContent = content;
+        return node;
+    }
+    const fmt = (value, digits = 1) => Number(value).toLocaleString(undefined, {maximumFractionDigits: digits});
+    const dateValue = date => Date.parse(`${date}T00:00:00Z`);
+    const spanDays = (dateValue(data.last_date) - dateValue(data.first_date)) / 86400000;
+    const shortDate = date => new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, spanDays > 330 ? {month:'short',year:'2-digit',timeZone:'UTC'} : {month:'short',day:'numeric',timeZone:'UTC'});
+    const percentage = data.metric_info.unit === '%';
+    const maxRate = data.series.reduce((maximum, series) => series.points.reduce((value, point) => Math.max(value, point.value ?? 0), maximum), 1);
+    const ceiling = percentage ? 100 : Math.ceil(maxRate * 1.15 / 5) * 5;
+    const buckets = data.series.slice(0, 3).map(bucket => ({
+        key: bucket.key, label: bucket.label,
+        series: data.series.filter(series => series.key === bucket.key),
+    }));
+    const deviceLabel = series => series.device_id ?? (data.device_view === 'combined' ? 'Combined devices' : 'No device data');
+    function draw(bucket) {
+        const host = document.getElementById(`chart-${bucket.key}`);
+        const reference = bucket.series[0].points;
+        host.replaceChildren();
+        const width = Math.max(320, host.clientWidth), height = width < 600 ? 260 : 285;
+        const left = 42, right = width - 14, top = 20, bottom = height - 104;
+        const barTop = bottom + 29, barBottom = height - 34;
+        const first = dateValue(data.first_date), last = dateValue(data.last_date);
+        const x = date => first === last ? (left + right) / 2 : left + (dateValue(date) - first) / (last - first) * (right - left);
+        const y = value => bottom - value / ceiling * (bottom - top);
+        const svg = svgNode('svg', {viewBox:`0 0 ${width} ${height}`, role:'img', 'aria-labelledby':`${bucket.key}-svg-title ${bucket.key}-svg-desc`});
+        svg.append(svgNode('title', {id:`${bucket.key}-svg-title`}, `${bucket.label}: ${data.metric_info.label} · ${bucket.series.map(deviceLabel).join(', ')}`));
+        svg.append(svgNode('desc', {id:`${bucket.key}-svg-desc`}, 'Devices share the same date and value axes, with colors matching the legend. Focus a point for details, or open the weekly data table. Grouped distance bars show driving each week.'));
+        const append = (tag, attrs, content) => { const node = svgNode(tag, attrs, content); svg.append(node); return node; };
+        for (let i = 0; i <= 4; i++) {
+            const value = ceiling * i / 4, py = y(value);
+            append('line', {x1:left, x2:right, y1:py, y2:py, stroke:'#293141', 'stroke-dasharray': i ? '3 5' : '0'});
+            append('text', {x:left - 9, y:py + 4, 'text-anchor':'end'}, `${fmt(value, 1)}${percentage ? '%' : ''}`);
+        }
+        append('text', {x:left, y:barTop - 6, 'font-size':9}, 'WEEKLY KM');
+        const maxKm = bucket.series.reduce((maximum, series) => series.points.reduce((value, point) => Math.max(value, point.weekly_distance_km), maximum), 1);
+        append('text', {x:right, y:barTop - 6, 'text-anchor':'end', 'font-size':9}, `max ${fmt(maxKm,0)} km`);
+        const groupWidth = Math.min(24, (right - left) / Math.max(1, reference.length) * .7);
+        const barWidth = groupWidth / bucket.series.length;
+        bucket.series.forEach((series, deviceIndex) => series.points.forEach(point => {
+            if (point.weekly_distance_km > 0) append('rect', {x:x(point.date) - groupWidth / 2 + deviceIndex * barWidth, y:barBottom - point.weekly_distance_km / maxKm * (barBottom - barTop), width:barWidth * .85, height:point.weekly_distance_km / maxKm * (barBottom - barTop), rx:1, fill:series.color, opacity:.5});
+        }));
+        append('line', {x1:left, x2:right, y1:barBottom, y2:barBottom, stroke:'#293141'});
+        const tickCount = width < 600 ? 3 : 6;
+        const ticksToShow = Math.min(tickCount, reference.length);
+        [...new Set(Array.from({length:ticksToShow}, (_, i) => Math.round(i * (reference.length - 1) / Math.max(1, ticksToShow - 1))))].forEach((index, i, ticks) => {
+            const point = reference[index];
+            append('text', {x:x(point.date), y:height - 10, 'text-anchor': i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}, shortDate(point.date));
+        });
+        bucket.series.forEach(series => {
+            const segments = []; let segment = [];
+            series.points.forEach(point => {
+                if (point.value === null) { if (segment.length) segments.push(segment); segment = []; }
+                else segment.push(point);
+            });
+            if (segment.length) segments.push(segment);
+            segments.forEach(points => {
+                const commands = points.map((point, index) => `${index ? 'L' : 'M'}${x(point.date)},${y(point.value)}`).join(' ');
+                if (bucket.series.length === 1 && points.length > 1) append('path', {d:`${commands} L${x(points.at(-1).date)},${bottom} L${x(points[0].date)},${bottom} Z`, fill:series.color, opacity:.05});
+                append('path', {d:commands, fill:'none', stroke:series.color, 'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round', 'data-device':deviceLabel(series)});
+            });
+        });
+        if (!bucket.series.some(series => series.points.some(point => point.value !== null))) append('text', {x:(left + right) / 2, y:(top + bottom) / 2, 'text-anchor':'middle'}, 'No usable driving data in this period');
+        const crosshair = append('line', {x1:0, x2:0, y1:top, y2:barBottom, stroke:'#a1aabd', opacity:0, 'stroke-dasharray':'3 4', 'pointer-events':'none'});
+        host.append(svg);
+        const tooltip = document.createElement('div'); tooltip.className = 'tooltip'; tooltip.hidden = true; host.append(tooltip);
+        function show(index) {
+            const point = reference[index];
+            crosshair.setAttribute('x1',x(point.date)); crosshair.setAttribute('x2',x(point.date)); crosshair.setAttribute('opacity',.65);
+            tooltip.replaceChildren();
+            const title = document.createElement('strong'); title.textContent = `${point.window_start} → ${point.window_end}`; tooltip.append(title);
+            bucket.series.forEach(series => {
+                const value = series.points[index];
+                const group = document.createElement('div'); group.className = 'tooltip-device'; group.style.setProperty('--device', series.color);
+                const name = document.createElement('p'); name.className = 'device-name'; name.textContent = deviceLabel(series); group.append(name);
+                const metric = document.createElement('p'); metric.textContent = value.value === null ? 'No data' : `${fmt(value.value,2)} ${data.metric_info.unit}`; group.append(metric);
+                const volume = document.createElement('p'); volume.className = 'detail'; volume.textContent = `${fmt(value.distance_km)} km · ${value.drive_count} drives · ${fmt(value.hours)} h`; group.append(volume);
+                const week = document.createElement('p'); week.className = 'detail'; week.textContent = `This week: ${fmt(value.weekly_distance_km)} km`; group.append(week);
+                if (value.estimated_drive_count) { const p = document.createElement('p'); p.className = 'detail estimate-note'; p.textContent = `${value.estimated_drive_count} dates estimated from uploads`; group.append(p); }
+                if (value.low_distance) { const p = document.createElement('p'); p.className = 'detail'; p.textContent = `Under ${data.low_distance_km} km in this window`; group.append(p); }
+                tooltip.append(group);
+            });
+            if (point.partial_week || point.date === data.last_date) { const p = document.createElement('p'); p.className = 'detail'; p.textContent = 'Latest point includes today so far'; tooltip.append(p); }
+            tooltip.hidden = false;
+            tooltip.style.left = `${Math.max(0, Math.min(width - tooltip.offsetWidth, x(point.date) + 14))}px`;
+            tooltip.style.top = '0px';
+        }
+        function hide() { tooltip.hidden = true; crosshair.setAttribute('opacity',0); }
+        bucket.series.forEach(series => series.points.forEach((point, index) => {
+            if (point.value === null) return;
+            if (point.estimated_drive_count) append('circle', {cx:x(point.date), cy:y(point.value), r:6, fill:'none', stroke:'#f2b56e', 'stroke-width':1.2, 'pointer-events':'none'});
+            const dot = append('circle', {cx:x(point.date), cy:y(point.value), r:3, fill:point.low_distance ? '#10141d' : series.color, stroke:series.color, 'stroke-width':1.4, tabindex:0, role:'img', 'aria-label':`${deviceLabel(series)} · ${point.date}: ${fmt(point.value,2)} ${data.metric_info.unit}, ${fmt(point.distance_km)} km, ${point.estimated_drive_count} upload estimates`});
+            dot.addEventListener('focus', () => show(index)); dot.addEventListener('blur',hide);
+            dot.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
+        }));
+        svg.addEventListener('pointermove', event => {
+            const rect = svg.getBoundingClientRect(), pointer = (event.clientX - rect.left) * width / rect.width;
+            const nearest = reference.reduce((best, point, index) => Math.abs(x(point.date) - pointer) < Math.abs(x(reference[best].date) - pointer) ? index : best, 0);
+            show(nearest);
+        });
+        svg.addEventListener('pointerleave',hide);
+    }
+    let timer;
+    const render = () => buckets.forEach(draw);
+    new ResizeObserver(() => { clearTimeout(timer); timer = setTimeout(render, 70); }).observe(document.querySelector('.shell'));
+    render();
+})();
+</script>
+</body>
+</html>

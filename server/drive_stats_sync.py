@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from .drive_dates import parse_timestamp
+
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -218,6 +220,13 @@ class DriveStatsSynchronizer:
             stats = _normalize_stats(item['stats'])
             key = (str(stats['device_id']), str(stats['drive']))
             previous = keyed_entries.get(key)
+            # Keep the earliest server receipt we have seen, across reuploads
+            # and cursor replays. Device-generated timestamps are not receipts.
+            received_at = parse_timestamp(item.get('received_at'))
+            previous_upload = parse_timestamp((previous or {}).get('uploaded_at'))
+            upload_dates = [date for date in (received_at, previous_upload) if date is not None]
+            if upload_dates:
+                stats['uploaded_at'] = min(upload_dates).isoformat()
             if previous != stats:
                 keyed_entries[key] = stats
                 imported += 1

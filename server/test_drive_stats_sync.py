@@ -67,6 +67,7 @@ class DriveStatsSynchronizerTests(unittest.TestCase):
             entry for entry in entries if entry.get('drive') == '2026-09-17--10-00-00'
         )
         self.assertEqual(imported_entry['intervention_count'], 2)
+        self.assertEqual(imported_entry['uploaded_at'], '2026-09-17T10:00:00+00:00')
         self.assertEqual(
             imported_entry['speed_buckets']['city']['intervention_count'], 1
         )
@@ -107,6 +108,42 @@ class DriveStatsSynchronizerTests(unittest.TestCase):
         ) as fetch:
             self.assertEqual(self.synchronizer.sync_once(), 0)
         fetch.assert_called_once_with(7)
+
+    def test_reupload_updates_metrics_without_changing_first_upload(self) -> None:
+        original = _source_item(1, 'route-1')
+        entries, _, _ = self.synchronizer._merge_page([], {'items': [original]}, 0)
+        replacement = _source_item(2, 'route-1')
+        replacement['received_at'] = '2026-10-18T10:00:00Z'
+        replacement['stats']['disengagement_count'] = 3
+        entries, _, imported = self.synchronizer._merge_page(
+            entries, {'items': [replacement]}, 1,
+        )
+        self.assertEqual(imported, 1)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['disengagement_count'], 3)
+        self.assertEqual(entries[0]['uploaded_at'], original['received_at'])
+
+    def test_cursor_replay_is_idempotent_and_can_recover_earlier_receipt(self) -> None:
+        item = _source_item(1, 'route-1')
+        entries, _, _ = self.synchronizer._merge_page([], {'items': [item]}, 0)
+        replayed, _, imported = self.synchronizer._merge_page(entries, {'items': [item]}, 0)
+        self.assertEqual(imported, 0)
+        self.assertEqual(entries, replayed)
+        item['received_at'] = '2026-09-16T12:00:00+02:00'
+        entries, _, imported = self.synchronizer._merge_page(entries, {'items': [item]}, 0)
+        self.assertEqual(imported, 1)
+        self.assertEqual(entries[0]['uploaded_at'], '2026-09-16T10:00:00+00:00')
+
+    def test_missing_receipt_preserves_previous_upload_without_inventing_one(self) -> None:
+        item = _source_item(1, 'route-1')
+        item['stats']['generated_at'] = '2026-09-17T10:00:00Z'
+        item['received_at'] = 'invalid'
+        entries, _, _ = self.synchronizer._merge_page([], {'items': [item]}, 0)
+        self.assertNotIn('uploaded_at', entries[0])
+        entries[0]['uploaded_at'] = '2026-09-17T10:00:00+00:00'
+        entries, _, imported = self.synchronizer._merge_page(entries, {'items': [item]}, 0)
+        self.assertEqual(imported, 0)
+        self.assertEqual(entries[0]['uploaded_at'], '2026-09-17T10:00:00+00:00')
 
     def test_v4_blinker_metrics_survive_sync(self) -> None:
         item = _source_item(1, '2026-09-19--10-00-00')
