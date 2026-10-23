@@ -49,6 +49,8 @@
         .topbar {
             min-height: 76px;
             display: flex;
+            flex-wrap: wrap;
+            padding: 12px 0;
             align-items: center;
             justify-content: space-between;
             gap: 28px;
@@ -86,7 +88,7 @@
             align-items: center;
         }
 
-        .nav { gap: 5px; }
+        .nav { gap: 5px; flex-wrap: wrap; }
 
         .nav a {
             display: inline-flex;
@@ -440,6 +442,7 @@
         @media (max-width: 900px) {
             .page { width: min(100% - 28px, 1640px); }
             .topbar { min-height: 68px; }
+            .topbar-right { width: 100%; }
             .sync-status { display: none; }
             .hero { padding-top: 43px; }
             .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -450,7 +453,7 @@
             .brand-product { display: none; }
             .nav { gap: 0; }
             .nav a { min-height: 34px; padding: 0 9px; font-size: 0.76rem; }
-            .nav a[href="/total_stats"], .nav a[href="/api/compare"] { display: none; }
+            .nav a[href="/api/compare"] { display: none; }
             .hero { display: block; padding: 34px 3px 24px; }
             .hero-meta { margin-top: 16px; text-align: left; }
             .hero-meta strong { display: inline; margin-left: 6px; }
@@ -490,6 +493,8 @@
                     <a href="/stats_mod" aria-current="page">Dashboard</a>
                     <a href="/compare">Compare</a>
                     <a href="/trends">Trends</a>
+                    <a href="/temperatures">HRR temperatures</a>
+                    <a href="/trqi-temperatures">TRQI temperatures</a>
                     <a href="/total_stats">Fleet totals</a>
                     <a href="/api/compare">API</a>
                 </nav>

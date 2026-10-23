@@ -76,6 +76,8 @@
         .topbar {
             min-height: 76px;
             display: flex;
+            flex-wrap: wrap;
+            padding: 12px 0;
             align-items: center;
             justify-content: space-between;
             gap: 28px;
@@ -122,6 +124,7 @@
 
         .nav {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             gap: 5px;
         }
@@ -1286,10 +1289,11 @@
                 min-height: 68px;
             }
 
-            .nav a:not([aria-current="page"]),
             .sync-status {
                 display: none;
             }
+
+            .nav-wrap { width: 100%; }
 
             .hero {
                 padding-top: 43px;
@@ -1538,6 +1542,8 @@
                     <a href="/stats_mod">Dashboard</a>
                     <a href="/compare" aria-current="page">Compare</a>
                     <a href="/trends">Trends</a>
+                    <a href="/temperatures">HRR temperatures</a>
+                    <a href="/trqi-temperatures">TRQI temperatures</a>
                     <a href="/total_stats">Fleet totals</a>
                     <a href="/api/compare">API</a>
                 </nav>
