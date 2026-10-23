@@ -9,6 +9,7 @@ database_backups/*.bak
 .drive_stats_sync.lock
 .web_auth.json
 .web_auth.sqlite3*
+.trend_events.sqlite3*
 
 # Compressed HRR telemetry library
 temperature.sqlite3*

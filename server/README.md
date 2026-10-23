@@ -190,6 +190,28 @@ where a recording date is available, matching the existing historical cutoff.
 Example: `/api/trends?window_weeks=8&history_weeks=52&metric=distance&include_estimates=false`.
 Repeat `device` and `branch` query parameters to select multiple values.
 
+The **System events → Add or manage events** panel lets the owner save a week,
+title and optional notes for a system modification. Events can apply to all
+devices or a single device. Every viewer sees matching events as numbered dashed
+lines in City, Road and Highway, across metrics and individual/combined views.
+The event list and marker hover/focus reveal the descriptions. Events in the same
+week share a marker. Weeks run Monday–Sunday in UTC and markers align with that
+week's observation (today for an unfinished week). Rolling windows still contain
+earlier driving, so a change may take several weeks to fully appear in the trend.
+Events annotate the charts without changing the metrics or branch filters.
+
+The owner can edit or remove events; members and guests have read-only access.
+Writes use the existing session and CSRF protection. With authentication explicitly
+disabled for local development, event management is also available locally.
+Events persist separately from synchronized driving records in
+`.trend_events.sqlite3` (ignored by Git); include it in backups. Override the path
+with `TREND_EVENTS_DATABASE`. `/api/trends` includes the visible `events` list.
+Check annotations and access control with:
+
+```bash
+.venv/bin/python -m unittest server.test_trend_events server.test_trends server.test_web_auth
+```
+
 ### Other endpoints
 
 ```bash

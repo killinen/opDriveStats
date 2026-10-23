@@ -9,7 +9,8 @@ from fastapi.templating import Jinja2Templates
 
 from .data import repository
 from .drive_stats_sync import DriveStatsSyncConfig, DriveStatsSynchronizer
-from .web_auth import install_auth, csrf_token
+from .web_auth import install_auth, csrf_token, check_csrf
+from .trend_events import event_store, visible_events
 from .temperature_sync import TemperatureSyncConfig, TemperatureSynchronizer
 from .temperature_routes import router as temperature_router
 from .trqi_temperature.routes import router as trqi_temperature_router
@@ -156,12 +157,59 @@ def api_trends_view(
     include_estimates: bool = True,
     device_view: str = 'individual',
 ) -> dict:
-    return build_trends(
+    trends = build_trends(
         repository.all_entries(), device_ids=device, branches=branch,
         window_weeks=window_weeks, history_weeks=history_weeks,
         metric=metric, include_estimates=include_estimates,
         device_view=device_view,
     )
+    trends['events'] = visible_events(event_store.listing(), trends)
+    return trends
+
+
+def can_manage_trend_events(request: Request) -> bool:
+    return (not request.app.state.auth_config.enabled
+            or (request.state.principal or {}).get('role') == 'owner')
+
+
+async def trend_event_form(request: Request):
+    if not can_manage_trend_events(request):
+        raise HTTPException(403, 'Only the owner can manage trend events')
+    await check_csrf(request)
+    return await request.form()
+
+
+@app.post('/api/trend-events', status_code=201, summary='Add a weekly system event')
+async def create_trend_event(request: Request):
+    form = await trend_event_form(request)
+    return save_trend_event(form)
+
+
+def save_trend_event(form, event_id=None):
+    try:
+        return event_store.save(
+            week=str(form.get('week', '')), title=str(form.get('title', '')),
+            notes=str(form.get('notes', '')), device_id=str(form.get('device_id', '')),
+            event_id=event_id,
+        )
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    except KeyError as error:
+        raise HTTPException(404, 'Event not found') from error
+
+
+@app.post('/api/trend-events/{event_id}', summary='Edit a weekly system event')
+async def update_trend_event(event_id: int, request: Request):
+    form = await trend_event_form(request)
+    return save_trend_event(form, event_id)
+
+
+@app.post('/api/trend-events/{event_id}/delete', summary='Remove a weekly system event')
+async def delete_trend_event(event_id: int, request: Request):
+    await trend_event_form(request)
+    if not event_store.delete(event_id):
+        raise HTTPException(404, 'Event not found')
+    return {'deleted': event_id}
 
 
 @app.get('/trends', summary='Performance over time', response_class=HTMLResponse)
@@ -176,7 +224,13 @@ def trends_view(
     device_view: str = 'individual',
 ) -> HTMLResponse:
     trends = api_trends_view(device, branch, window_weeks, history_weeks, metric, include_estimates, device_view)
-    return templates.TemplateResponse('trends.html', {'request': request, 'trends': trends})
+    can_manage = can_manage_trend_events(request)
+    return templates.TemplateResponse('trends.html', {
+        'request': request, 'trends': trends,
+        'can_manage_events': can_manage,
+        'csrf': csrf_token(request) if can_manage else None,
+        'saved_events': event_store.listing() if can_manage else [],
+    })
 
 
 @app.get('/total_stats', summary='Modern engagement dashboard with totals', response_class=HTMLResponse)

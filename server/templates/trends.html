@@ -96,6 +96,23 @@
         .method summary { color:var(--text); font-weight:650; }
         .method p { margin-top:13px; max-width:1000px; }
         .empty-state { margin:18px 0; padding:22px; background:#a793ff0d; border:1px solid #a793ff44; border-radius:12px; }
+        .events { margin:20px 0; padding:18px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
+        .events h2 { margin:0 0 7px; font-size:17px; }
+        .events p, .events summary { font-size:12px; }
+        .event-list { list-style:none; padding:0; margin:12px 0; }
+        .event-list li { padding:10px 0; border-top:1px solid var(--line); overflow-wrap:anywhere; }
+        .event-number { display:inline-block; min-width:23px; margin-right:7px; border:1px solid var(--orange); border-radius:5px; text-align:center; color:var(--orange); font-size:12px; }
+        .event-meta, .event-notes { display:block; margin-top:4px; font-size:12px; color:var(--muted); white-space:pre-wrap; }
+        .event-form { display:flex; align-items:end; gap:12px; flex-wrap:wrap; margin:16px 0; }
+        .event-form input, .event-form textarea { width:100%; padding:8px 10px; border:1px solid #343d4f; border-radius:8px; background:#0c1018; color:var(--text); }
+        .event-form .event-title, .event-form .event-note-field { flex:2 1 240px; }
+        .event-form textarea { font:inherit; resize:vertical; min-height:40px; }
+        .event-action { border:1px solid #414b60; border-radius:7px; color:var(--text); background:transparent; padding:6px 10px; margin:5px 5px 0 0; font-size:12px; }
+        .event-action:disabled, .event-form button:disabled { opacity:.5; cursor:wait; }
+        #event-status { margin-top:8px; color:var(--orange); }
+        .event-marker { cursor:help; }
+        .event-marker:focus { outline:none; }
+        .event-marker:focus rect { stroke:white; stroke-width:2; }
         footer { display:flex; justify-content:space-between; gap:20px; color:var(--muted); font-size:11px; }
         @media (max-width:800px) { .shell { width:calc(100% - 28px); } .topbar { padding:14px 0; flex-wrap:wrap; } nav { gap:15px; } .intro { padding-top:28px; } .cadence { display:none; } .coverage { grid-template-columns:repeat(2,1fr); } .chart-intro { align-items:start; flex-direction:column; gap:9px; } .bucket { padding:18px 14px 12px; } .chart { min-height:150px; } .field { flex-basis:calc(50% - 12px); } .headline .value { font-size:25px; } .chart-foot { align-items:start; } }
         @media (prefers-reduced-motion:no-preference) { .apply { transition:filter .15s; } .apply:hover { filter:brightness(1.1); } }
@@ -132,6 +149,31 @@
         <div class="stat"><strong>{{ trends.coverage.undated_drives }}</strong><span>Undated drives · excluded</span></div>
     </section>
     <p class="muted" style="font-size:11px">Date coverage covers all matching history. Charts show the selected period; missing metric fields are excluded from that metric.</p>
+    <section class="events" aria-labelledby="events-title">
+        <h2 id="events-title">System events</h2>
+        <p class="muted">Mark a change to compare the trends around that week. Numbered dashed lines appear in every speed bucket. Weeks run Monday–Sunday in UTC; markers sit on the week's chart point. Rolling values may still include {{ trends.window_weeks }} weeks of earlier driving.</p>
+        <ol class="event-list">
+            {% for event in trends.events|default([]) %}
+            <li><span class="event-number">{{ event.marker }}</span><strong>{{ event.title }}</strong><span class="event-meta">{{ event.week }} · Week of {{ event.week_start }} · {{ event.device_id or 'All devices' }}</span>{% if event.notes %}<span class="event-notes">{{ event.notes }}</span>{% endif %}</li>
+            {% else %}<li class="muted">No events in the displayed weeks for these devices.</li>{% endfor %}
+        </ol>
+        {% if can_manage_events %}
+        <details id="event-manager">
+            <summary>Add or manage events</summary>
+            <form id="event-form" class="event-form" action="/api/trend-events" method="post">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <div class="field"><label for="event-week">Week (YYYY-Www)</label><input id="event-week" type="week" name="week" required pattern="[0-9]{4}-W[0-9]{2}" placeholder="2026-W43"></div>
+                <div class="field event-title"><label for="event-title">Event title</label><input id="event-title" name="title" required maxlength="120" placeholder="e.g. Steering firmware updated"></div>
+                <div class="field"><label for="event-device">Applies to</label><select id="event-device" name="device_id"><option value="">All devices</option>{% for device in trends.devices %}<option value="{{ device }}">{{ device }}</option>{% endfor %}</select></div>
+                <div class="field event-note-field"><label for="event-notes">Notes (optional)</label><textarea id="event-notes" name="notes" maxlength="1000" rows="1"></textarea></div>
+                <button type="submit" class="apply" id="event-save">Add event</button><button type="button" class="event-action" id="event-cancel" hidden>Cancel edit</button>
+            </form>
+            <p id="event-status" role="status" aria-live="polite"></p>
+            <p class="muted">Saved events are shared with everyone who can view Trends. This list includes events outside the current filters.</p>
+            <ul class="event-list">{% for event in saved_events %}<li><strong>{{ event.title }}</strong><span class="event-meta">{{ event.week }} · Week of {{ event.week_start }} · {{ event.device_id or 'All devices' }}</span><button type="button" class="event-action" data-edit-event="{{ event.id }}" aria-label="Edit event: {{ event.title }}">Edit</button><button type="button" class="event-action" data-delete-event="{{ event.id }}" aria-label="Remove event: {{ event.title }}">Remove</button></li>{% endfor %}</ul>
+        </details>
+        {% else %}<p class="muted">The owner can add and manage shared events.</p>{% endif %}
+    </section>
     <div class="chart-intro"><h2>{{ trends.metric_info.label }} by speed bucket</h2><div class="legend"><span><i class="dot"></i>Rolling value</span><span><i class="ring"></i>Includes upload estimates</span><span><i class="hollow"></i>Under {{ trends.low_distance_km }} km in window</span></div></div>
     {% if not trends.coverage.dated_drives %}<div class="empty-state">No dated drives match these filters. Try including upload estimates or choosing other devices and branches.</div>{% endif %}
     {% for bucket in trends.series[:3] %}
@@ -167,12 +209,60 @@
     <noscript><p class="empty-state">Enable JavaScript for interactive charts. All weekly values are available in the tables above.</p></noscript>
 </main>
 <script id="trend-data" type="application/json">{{ trends|tojson }}</script>
+{% if can_manage_events %}<script id="saved-events" type="application/json">{{ saved_events|tojson }}</script>{% endif %}
 <script>
 (() => {
     'use strict';
     const data = JSON.parse(document.getElementById('trend-data').textContent);
     const api = document.getElementById('api-link');
     api.search = location.search;
+    const eventForm = document.getElementById('event-form');
+    if (eventForm) {
+        const savedEvents = JSON.parse(document.getElementById('saved-events').textContent);
+        const status = document.getElementById('event-status');
+        const saveButton = document.getElementById('event-save');
+        const cancelButton = document.getElementById('event-cancel');
+        let editing = null;
+        async function mutateEvent(url, formData) {
+            status.textContent = 'Saving…';
+            const buttons = document.querySelectorAll('#event-manager button');
+            buttons.forEach(button => { button.disabled = true; });
+            try {
+                const response = await fetch(url, {method:'POST', body:formData, headers:{'Accept':'application/json'}});
+                if (response.redirected) throw new Error('Your session expired. Reload the page and sign in again.');
+                if (!response.ok) {
+                    const result = await response.json();
+                    throw new Error(typeof result.detail === 'string' ? result.detail : 'Could not save this event.');
+                }
+                location.reload();
+            } catch (error) {
+                status.textContent = error.message;
+                buttons.forEach(button => { button.disabled = false; });
+            }
+        }
+        eventForm.addEventListener('submit', event => {
+            event.preventDefault();
+            mutateEvent(editing === null ? '/api/trend-events' : `/api/trend-events/${editing}`, new FormData(eventForm));
+        });
+        cancelButton.addEventListener('click', () => {
+            editing = null; eventForm.reset(); saveButton.textContent = 'Add event'; cancelButton.hidden = true; status.textContent = '';
+        });
+        document.querySelectorAll('[data-edit-event]').forEach(button => button.addEventListener('click', () => {
+            const event = savedEvents.find(item => item.id === Number(button.dataset.editEvent));
+            editing = event.id;
+            for (const name of ['week', 'title', 'notes', 'device_id']) {
+                const input = eventForm.elements.namedItem(name);
+                if (name === 'device_id' && event.device_id && !Array.from(input.options).some(option => option.value === event.device_id)) input.add(new Option(event.device_id, event.device_id));
+                input.value = event[name];
+            }
+            saveButton.textContent = 'Save changes'; cancelButton.hidden = false; status.textContent = '';
+            document.getElementById('event-week').focus();
+        }));
+        document.querySelectorAll('[data-delete-event]').forEach(button => button.addEventListener('click', () => {
+            const body = new FormData(); body.set('csrf', eventForm.elements.namedItem('csrf').value);
+            mutateEvent(`/api/trend-events/${button.dataset.deleteEvent}/delete`, body);
+        }));
+    }
     document.querySelectorAll('[data-clear]').forEach(button => button.addEventListener('click', () => {
         button.closest('.choices').querySelectorAll('input').forEach(input => { input.checked = false; });
         updateChoices(button.closest('details'));
@@ -207,19 +297,29 @@
         series: data.series.filter(series => series.key === bucket.key),
     }));
     const deviceLabel = series => series.device_id ?? (data.device_view === 'combined' ? 'Combined devices' : 'No device data');
+    const eventGroups = Array.from(new Set((data.events ?? []).map(event => event.week_start))).map(week => data.events.filter(event => event.week_start === week));
     function draw(bucket) {
         const host = document.getElementById(`chart-${bucket.key}`);
         const reference = bucket.series[0].points;
         host.replaceChildren();
         const width = Math.max(320, host.clientWidth), height = width < 600 ? 260 : 285;
-        const left = 42, right = width - 14, top = 20, bottom = height - 104;
+        const left = 42, right = width - 14, bottom = height - 104;
         const barTop = bottom + 29, barBottom = height - 34;
         const first = dateValue(data.first_date), last = dateValue(data.last_date);
         const x = date => first === last ? (left + right) / 2 : left + (dateValue(date) - first) / (last - first) * (right - left);
+        const laneEnds = [];
+        const markerLanes = eventGroups.map((events, index) => {
+            const px = x(events[0].chart_date);
+            let lane = laneEnds.findIndex(previous => px - previous >= 28);
+            if (lane < 0) lane = laneEnds.length < 4 ? laneEnds.length : index % 4;
+            laneEnds[lane] = px;
+            return lane;
+        });
+        const top = 20 + Math.max(0, laneEnds.length - 1) * 20;
         const y = value => bottom - value / ceiling * (bottom - top);
         const svg = svgNode('svg', {viewBox:`0 0 ${width} ${height}`, role:'img', 'aria-labelledby':`${bucket.key}-svg-title ${bucket.key}-svg-desc`});
         svg.append(svgNode('title', {id:`${bucket.key}-svg-title`}, `${bucket.label}: ${data.metric_info.label} · ${bucket.series.map(deviceLabel).join(', ')}`));
-        svg.append(svgNode('desc', {id:`${bucket.key}-svg-desc`}, 'Devices share the same date and value axes, with colors matching the legend. Focus a point for details, or open the weekly data table. Grouped distance bars show driving each week.'));
+        svg.append(svgNode('desc', {id:`${bucket.key}-svg-desc`}, 'Devices share the same date and value axes, with colors matching the legend. Numbered dashed lines mark system events listed above the charts. Focus an event or point for details, or open the weekly data table. Grouped distance bars show driving each week.'));
         const append = (tag, attrs, content) => { const node = svgNode(tag, attrs, content); svg.append(node); return node; };
         for (let i = 0; i <= 4; i++) {
             const value = ceiling * i / 4, py = y(value);
@@ -280,6 +380,30 @@
             tooltip.style.top = '0px';
         }
         function hide() { tooltip.hidden = true; crosshair.setAttribute('opacity',0); }
+        function showEvent(index) {
+            hide(); tooltip.replaceChildren();
+            const events = eventGroups[index];
+            const heading = document.createElement('strong'); heading.textContent = `Week of ${events[0].week_start}`; tooltip.append(heading);
+            events.forEach(event => {
+                const title = document.createElement('p'); title.textContent = `${event.title} · ${event.device_id || 'All devices'}`; tooltip.append(title);
+                if (event.notes) { const note = document.createElement('p'); note.className = 'detail'; note.textContent = event.notes; tooltip.append(note); }
+            });
+            tooltip.hidden = false;
+            tooltip.style.left = `${Math.max(0, Math.min(width - tooltip.offsetWidth, x(events[0].chart_date) + 14))}px`;
+            tooltip.style.top = '0px';
+        }
+        eventGroups.forEach((events, index) => {
+            const event = events[0], px = x(event.chart_date), labelY = markerLanes[index] * 20;
+            const label = `Event ${event.marker}, week of ${event.week_start}: ${events.map(item => item.title).join('; ')}`;
+            const group = append('g', {class:'event-marker', tabindex:0, role:'img', 'aria-label':label, 'data-event-marker':index});
+            group.append(svgNode('title', {}, label));
+            group.append(svgNode('line', {x1:px, x2:px, y1:labelY + 18, y2:barBottom, stroke:'#f2b56e', 'stroke-dasharray':'5 4', 'stroke-width':1.5}));
+            group.append(svgNode('rect', {x:px - 8, y:labelY, width:16, height:barBottom - labelY, fill:'transparent'}));
+            group.append(svgNode('rect', {x:px - 12, y:labelY, width:24, height:18, rx:4, fill:'#33271c', stroke:'#f2b56e'}));
+            const number = svgNode('text', {x:px, y:labelY + 13, 'text-anchor':'middle'}, event.marker); number.style.fill = '#f2b56e'; group.append(number);
+            group.addEventListener('focus', () => showEvent(index)); group.addEventListener('blur', hide);
+            group.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
+        });
         bucket.series.forEach(series => series.points.forEach((point, index) => {
             if (point.value === null) return;
             if (point.estimated_drive_count) append('circle', {cx:x(point.date), cy:y(point.value), r:6, fill:'none', stroke:'#f2b56e', 'stroke-width':1.2, 'pointer-events':'none'});
@@ -288,6 +412,8 @@
             dot.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
         }));
         svg.addEventListener('pointermove', event => {
+            const marker = event.target.closest('[data-event-marker]');
+            if (marker) { showEvent(Number(marker.dataset.eventMarker)); return; }
             const rect = svg.getBoundingClientRect(), pointer = (event.clientX - rect.left) * width / rect.width;
             const nearest = reference.reduce((best, point, index) => Math.abs(x(point.date) - pointer) < Math.abs(x(reference[best].date) - pointer) ? index : best, 0);
             show(nearest);
