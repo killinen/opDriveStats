@@ -57,7 +57,8 @@ class DriveDate:
 def resolve_drive_date(
     row: Mapping[str, Any], *, now: Optional[datetime] = None
 ) -> DriveDate:
-    """Prefer plausible recording dates, then the earliest retained server receipt.
+    """Prefer a trusted OP-NAS start, then plausible recording dates, then the
+    earliest retained server receipt.
 
     Old uploads remain valid: age alone cannot distinguish an archive from a bad
     clock. A recording predating its software commit, or beyond server time, is
@@ -75,6 +76,14 @@ def resolve_drive_date(
     commit = _commit_timestamp(row.get('git_commit_date'))
     if commit is not None and EARLIEST_DRIVE_DATE <= commit <= latest + CLOCK_TOLERANCE:
         earliest = max(earliest, commit - CLOCK_TOLERANCE)
+
+    # A start found by OP-NAS (GPS time, or a clock it verified) beats the
+    # device clock, which can be plausible yet wrong on an offline device.
+    trusted = row.get('trusted_start')
+    if isinstance(trusted, Mapping):
+        timestamp = parse_timestamp(trusted.get('value'))
+        if timestamp is not None and earliest <= timestamp <= latest + CLOCK_TOLERANCE:
+            return DriveDate(timestamp, 'trusted_start')
 
     for source in ('recorded_at', 'drive'):
         timestamp = parse_timestamp(row.get(source))

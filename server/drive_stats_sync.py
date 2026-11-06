@@ -227,6 +227,9 @@ class DriveStatsSynchronizer:
             upload_dates = [date for date in (received_at, previous_upload) if date is not None]
             if upload_dates:
                 stats['uploaded_at'] = min(upload_dates).isoformat()
+            # Imported OP-NAS starts are not part of the device payload; keep them.
+            if 'trusted_start' not in stats and isinstance((previous or {}).get('trusted_start'), dict):
+                stats['trusted_start'] = previous['trusted_start']
             if previous != stats:
                 keyed_entries[key] = stats
                 imported += 1

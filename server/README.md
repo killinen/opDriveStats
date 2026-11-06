@@ -153,6 +153,22 @@ The cursor, lock, and default token files are ignored by Git. Existing entries
 in `engagement_db.json` are retained, so this replaces the old SSH file-copy
 workflow without discarding historical statistics.
 
+### Import trusted drive starts from OP-NAS
+
+Devices without network at boot record with a wrong clock, so their drives are
+undated or dated by upload on the trends page. OP-NAS finds the real start from
+GPS time in the archived rlogs. Import them as `trusted_start` (kept across
+re-uploads by the synchronizer; repeat runs only apply changes):
+
+```bash
+ssh pi4 "/opt/opnas/venv/bin/python -c 'import sqlite3,json; from opnas.telemetry.drive_times import drive_starts; db=sqlite3.connect(\"file:/var/lib/opnas/telemetry/telemetry.sqlite?mode=ro\",uri=True); print(json.dumps(list(drive_starts(db).values())))'" > drive_times.json
+.venv/bin/python -m server.drive_times_import drive_times.json --device ff528bde139e99de --dry-run
+.venv/bin/python -m server.drive_times_import drive_times.json --device ff528bde139e99de
+```
+
+Starts must pass the same software-date and upload-receipt checks as device
+clocks. The running site picks up the rewritten database automatically.
+
 ## Example Requests
 
 ### Performance trends
